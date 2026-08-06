@@ -5,9 +5,10 @@
 > "เราไม่ได้สร้างเครื่องมืออ่านข่าวให้ RM — เราสร้างเครื่องมือที่ทำให้ RM มีอะไรที่ลูกค้าอ่านเองไม่ได้"
 > *(We didn't build a tool that reads news for RMs — we built a tool that gives RMs something clients can't read for themselves.)*
 
-Built for the **AI × Finance Hackathon by CFA Society Thailand** (2026). Reached the semi-final round.
+Built for the **AI × Finance Hackathon by CFA Society Thailand** (2026). 🏆 **1st Place / Champion.**
 
 **🔗 Live demo:** [cfa-hackathon-demo.vercel.app](https://cfa-hackathon-demo.vercel.app)
+**📄 License:** [CC BY-NC 4.0](./LICENSE)
 
 ---
 
@@ -109,8 +110,24 @@ Documented honestly here because the hackathon's own feasibility rubric rewards 
 
 ## Team
 
-Built as the sole technical member of the team for CFA Society Thailand's AI × Finance Hackathon 2026, covering the AI pipeline, matching logic, and frontend build end-to-end.
+| Member | Faculty | Role |
+|---|---|---|
+| [Kritteera Moonboon](https://www.linkedin.com/in/kritteera-moonboon-058aa43b3/) | Economics, Chiang Mai University | Market & Economic Research — sourced the news/market-outcome pairs and the dislocation logic behind them |
+| [Wisarut Selaman](https://www.linkedin.com/in/wisarut-selaman-7ba35a257/) | Business Administration, Chiang Mai University | Business Strategy & Pitch — problem framing, value proposition, and slide narrative |
+| [Ponlapat Meejan](https://www.linkedin.com/in/ponlapat-meejan-46aa83426/) | Business Administration (Accounting), Chiang Mai University | Compliance & Financial Reporting — Four Eyes / Thai SEC compliance framing, feasibility case |
+| Nutnaree Zusuwan | Management Sciences (Finance), Prince of Songkla University | Portfolio & Investment Analysis — client holdings structure and risk-profile logic |
+| [Nattapat Srirung](https://www.linkedin.com/in/nattapat-srirung-36a438361/) | Computer Engineering, Chiang Mai University | AI/Tech Lead — sole technical member; built the agent pipeline, matching logic, and frontend end-to-end |
+
+Built for the AI × Finance Hackathon by CFA Society Thailand, 2026.
 
 ## License
 
-No license file is currently included, which under GitHub's default means all rights are reserved — feel free to read and reference the code, but please reach out before reusing it.
+This project is licensed under **[Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)](./LICENSE)**.
+
+In short, that means:
+- ✅ Anyone can view, share, and adapt this work, including for building on the idea
+- ✅ Attribution to the team is required
+- ❌ **No commercial use** without the team's explicit permission
+- The full legal terms are in [`LICENSE`](./LICENSE); a human-readable summary is at [creativecommons.org/licenses/by-nc/4.0](https://creativecommons.org/licenses/by-nc/4.0/)
+
+Copyright © 2026 the RM Advantage Engine team (see [Team](#team) above).
