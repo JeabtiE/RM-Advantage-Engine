@@ -258,6 +258,20 @@ test("every real demo payload passes validation and reaches the API once", async
   }
 });
 
+test("script payload whose matchedHoldings carry matchedBy/direction passes validation", async () => {
+  const client = {
+    ...n006Run.affectedClients[0],
+    matchedHoldings: n006Run.affectedClients[0].matchedHoldings.map((h) => ({
+      ...h,
+      matchedBy: "sector",
+      direction: "negative",
+    })),
+  };
+  const out = await call({ body: { agent: "script", analysis: n006Run.analysis, client } });
+  assert.equal(out.status, 200, JSON.stringify(out.body));
+  assert.equal(fetchCalls.length, 1);
+});
+
 test("a long live-mode item (title + ~700-char lede) passes validation", async () => {
   const title = "Central Pattana and Mitsubishi Estate announce $330m mixed-use project".repeat(2);
   const news = adaptLiveItem({
