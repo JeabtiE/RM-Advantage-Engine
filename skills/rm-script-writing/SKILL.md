@@ -99,6 +99,14 @@ demo runs predate the field and omit it.
 - Presenting both sides is information, not a rebalancing suggestion — never tell the client
   to shift from one to the other.
 
+### Sector mechanism per holding
+Each sector in Agent 1's `sector_impacts` carries a `reason` — one short, fact-checked Thai
+sentence giving the mechanism (e.g. "ดอกเบี้ยที่สูงขึ้นเพิ่มต้นทุนสินเชื่อที่อยู่อาศัย" for property).
+The Agent 3 prompt appends it to each matched holding as `— sector mechanism: …`, looked up by
+the holding's sector. Use it as the §3 mechanism for that holding, in plain words; do not add
+figures, events or company facts beyond it and the approved insight. Holdings without one
+(cached runs, or a sector with no stated reason) fall back to the approved reasoning as before.
+
 ## 4. Tone by Risk Profile
 
 Tone changes the framing, not the informational stance. Every profile stays

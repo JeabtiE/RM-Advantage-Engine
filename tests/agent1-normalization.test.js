@@ -9,10 +9,13 @@ import assert from "node:assert/strict";
 import {
   normalizeAgent1Output,
   heldSectorsFromSummary,
+  heldTickersFromSummary,
   normalizeAgent2Output,
+  MAX_SECTOR_REASON_CHARS,
 } from "../api/claude-agent.js";
 import { buildHoldingsSummary, findAffectedClients } from "../src/utils/matching.js";
-import { getAllSectors } from "../src/data/mockClients.js";
+import { getAllSectors, getAllTickers, mockClients } from "../src/data/mockClients.js";
+import { cachedDemoRuns } from "../src/data/cachedDemoRun.js";
 
 const HELD = heldSectorsFromSummary(buildHoldingsSummary());
 
@@ -41,8 +44,8 @@ test("clean output passes through with no notes", () => {
     affected_sectors: ["banking", "property"],
     event_scope: "systemic",
     sector_impacts: [
-      { sector: "banking", direction: "positive" },
-      { sector: "property", direction: "negative" },
+      { sector: "banking", direction: "positive", reason: "ดอกเบี้ยสูงขึ้นขยายส่วนต่างดอกเบี้ย" },
+      { sector: "property", direction: "negative", reason: "ต้นทุนสินเชื่อที่อยู่อาศัยสูงขึ้น" },
     ],
   });
   const out = normalizeAgent1Output(input, HELD);
@@ -72,8 +75,8 @@ test("union: a sector only in sector_impacts is added to affected_sectors", () =
     base({
       affected_sectors: ["banking"],
       sector_impacts: [
-        { sector: "banking", direction: "positive" },
-        { sector: "property", direction: "negative" },
+        { sector: "banking", direction: "positive", reason: "r1" },
+        { sector: "property", direction: "negative", reason: "r2" },
       ],
     }),
     HELD,
@@ -124,7 +127,7 @@ test("unknown (unheld) sector in sector_impacts is dropped with a note", () => {
   assert.ok(out.normalization_notes.some((n) => n.includes("retail")));
 });
 
-test("unknown direction becomes neutral with a note", () => {
+test("unknown direction becomes neutral with a note (and, being neutral, stops driving matching)", () => {
   const out = normalizeAgent1Output(
     base({
       affected_sectors: ["banking", "energy"],
@@ -139,7 +142,10 @@ test("unknown direction becomes neutral with a note", () => {
     { sector: "banking", direction: "neutral" },
     { sector: "energy", direction: "neutral" },
   ]);
-  assert.equal(out.normalization_notes.length, 2);
+  assert.deepEqual(out.affected_sectors, []);
+  // 2 direction notes + 1 note naming both removed sectors.
+  assert.equal(out.normalization_notes.length, 3);
+  assert.match(out.normalization_notes[2], /banking, energy/);
 });
 
 test("duplicate sectors keep the first entry", () => {
@@ -188,26 +194,175 @@ test("invalid event_scope is removed (matching defaults to systemic)", () => {
   assert.equal(cased.normalization_notes.length, 1);
 });
 
-test("single_company with no tickers is downgraded to sector, with the reason", () => {
+// --- single_company: never downgraded -------------------------------------------------
+
+const HELD_TICKERS = heldTickersFromSummary(buildHoldingsSummary());
+
+test("heldTickersFromSummary reads every held ticker", () => {
+  assert.equal(HELD_TICKERS.size, getAllTickers().length);
+  assert.ok(HELD_TICKERS.has("AP") && HELD_TICKERS.has("PTTEP") && HELD_TICKERS.has("PTT"));
+});
+
+for (const [label, affected_tickers] of [
+  ["empty tickers", []],
+  ["only unheld tickers", ["CRC", "HMPRO"]],
+]) {
+  test(`single_company with ${label}: scope kept, note present, zero clients matched`, () => {
+    const out = normalizeAgent1Output(
+      base({
+        event_scope: "single_company",
+        affected_tickers,
+        affected_sectors: ["property"],
+        sector_impacts: [{ sector: "property", direction: "positive", reason: "r" }],
+      }),
+      HELD,
+      HELD_TICKERS,
+    );
+    assert.equal(out.event_scope, "single_company");
+    assert.equal(out.normalization_notes.length, 1);
+    assert.match(out.normalization_notes[0], /ไม่มีลูกค้ารายใดถือหุ้น/);
+    assert.deepEqual(findAffectedClients(out, mockClients), []);
+  });
+}
+
+test("single_company with a held ticker: scope kept, no note", () => {
+  const out = normalizeAgent1Output(
+    base({ event_scope: "single_company", affected_tickers: ["crc", "cpn"] }),
+    HELD,
+    HELD_TICKERS,
+  );
+  assert.equal(out.event_scope, "single_company");
+  assert.deepEqual(out.normalization_notes, []);
+});
+
+test("single_company without heldTickers argument: only an empty list is noted", () => {
+  const empty = normalizeAgent1Output(base({ event_scope: "single_company" }), HELD);
+  assert.equal(empty.event_scope, "single_company");
+  assert.equal(empty.normalization_notes.length, 1);
+  const named = normalizeAgent1Output(base({ event_scope: "single_company", affected_tickers: ["CRC"] }), HELD);
+  assert.deepEqual(named.normalization_notes, []);
+});
+
+// --- Neutral sectors do not drive matching --------------------------------------------
+
+test("explicit neutral sector is removed from affected_sectors, kept in sector_impacts, with a note", () => {
   const out = normalizeAgent1Output(
     base({
-      event_scope: "single_company",
-      affected_tickers: [],
-      affected_sectors: ["property"],
-      sector_impacts: [{ sector: "property", direction: "positive" }],
+      affected_sectors: ["banking", "energy", "healthcare"],
+      sector_impacts: [
+        { sector: "banking", direction: "positive", reason: "r" },
+        { sector: "energy", direction: "neutral" },
+        { sector: "healthcare", direction: "neutral", reason: "defensive" },
+      ],
     }),
     HELD,
   );
-  assert.equal(out.event_scope, "sector");
-  assert.equal(out.normalization_notes.length, 1);
-  assert.match(out.normalization_notes[0], /single_company/);
+  assert.deepEqual(out.affected_sectors, ["banking"]);
+  assert.deepEqual(out.sector_impacts.map((s) => s.sector), ["banking", "energy", "healthcare"]);
+  assert.equal(out.normalization_notes.length, 1, "neutral entries need no reason");
+  assert.match(out.normalization_notes[0], /energy, healthcare/);
+});
 
-  const kept = normalizeAgent1Output(
-    base({ event_scope: "single_company", affected_tickers: ["CPN"] }),
+test("a neutral sector only in sector_impacts is not added by the union", () => {
+  const out = normalizeAgent1Output(
+    base({
+      affected_sectors: ["banking"],
+      sector_impacts: [
+        { sector: "banking", direction: "positive", reason: "r" },
+        { sector: "telecom", direction: "neutral" },
+      ],
+    }),
     HELD,
   );
-  assert.equal(kept.event_scope, "single_company");
-  assert.deepEqual(kept.normalization_notes, []);
+  assert.deepEqual(out.affected_sectors, ["banking"]);
+  assert.deepEqual(out.normalization_notes, [], "nothing was added or removed");
+});
+
+test("sectors without a sector_impacts entry are untouched; a named ticker in a neutral sector still matches", () => {
+  const out = normalizeAgent1Output(
+    base({
+      sentiment: "positive",
+      affected_tickers: ["PTT"],
+      affected_sectors: ["banking", "energy"],
+      sector_impacts: [{ sector: "energy", direction: "neutral" }],
+    }),
+    HELD,
+  );
+  assert.deepEqual(out.affected_sectors, ["banking"]);
+  const matched = findAffectedClients(out, [
+    {
+      clientId: "P",
+      aum: 1,
+      holdings: [
+        { ticker: "PTT", name: "PTT", sector: "energy", weight: 0.5 },
+        { ticker: "GULF", name: "Gulf", sector: "energy", weight: 0.2 },
+        { ticker: "KBANK", name: "K", sector: "banking", weight: 0.3 },
+      ],
+    },
+  ]);
+  assert.deepEqual(
+    matched[0].matchedHoldings.map((h) => `${h.ticker}:${h.matchedBy}:${h.direction}`),
+    ["PTT:ticker:neutral", "KBANK:sector:positive"],
+  );
+});
+
+// --- Per-sector reason -------------------------------------------------------------------
+
+test("missing / blank reason on a non-neutral entry: entry kept, note names the sector", () => {
+  const out = normalizeAgent1Output(
+    base({
+      affected_sectors: ["banking", "property"],
+      sector_impacts: [
+        { sector: "banking", direction: "positive" },
+        { sector: "property", direction: "negative", reason: "   " },
+      ],
+    }),
+    HELD,
+  );
+  assert.deepEqual(out.sector_impacts, [
+    { sector: "banking", direction: "positive" },
+    { sector: "property", direction: "negative" },
+  ]);
+  assert.deepEqual(out.affected_sectors, ["banking", "property"]);
+  assert.equal(out.normalization_notes.length, 2);
+  assert.match(out.normalization_notes[0], /banking/);
+  assert.match(out.normalization_notes[1], /property/);
+});
+
+test("reasons are trimmed and capped; a non-string reason is removed with a note", () => {
+  const long = "ก".repeat(MAX_SECTOR_REASON_CHARS + 50);
+  const out = normalizeAgent1Output(
+    base({
+      affected_sectors: ["banking", "property", "energy"],
+      sector_impacts: [
+        { sector: "banking", direction: "positive", reason: "  สั้น  " },
+        { sector: "property", direction: "negative", reason: long },
+        { sector: "energy", direction: "negative", reason: 42 },
+      ],
+    }),
+    HELD,
+  );
+  assert.equal(out.sector_impacts[0].reason, "สั้น");
+  assert.equal(out.sector_impacts[1].reason.length, MAX_SECTOR_REASON_CHARS);
+  assert.ok(out.sector_impacts[1].reason.endsWith("…"));
+  assert.equal("reason" in out.sector_impacts[2], false);
+  assert.ok(out.normalization_notes.some((n) => n.includes("property")));
+  assert.ok(out.normalization_notes.filter((n) => n.includes("energy")).length === 2);
+});
+
+// --- Cached-run regression -----------------------------------------------------------------
+
+test("cached analyses are unchanged by normalization and still yield the cached ranking", () => {
+  for (const [id, run] of Object.entries(cachedDemoRuns)) {
+    const out = normalizeAgent1Output(run.analysis, HELD, HELD_TICKERS);
+    assert.deepEqual(out, { ...run.analysis, normalization_notes: [] }, id);
+    const ranked = findAffectedClients(out).sort((a, b) => b.priorityScore - a.priorityScore);
+    assert.deepEqual(
+      ranked.map((c) => [c.clientId, c.priorityScore]),
+      run.affectedClients.map((c) => [c.clientId, c.priorityScore]),
+      id,
+    );
+  }
 });
 
 test("does not mutate its input; non-object input is returned as-is", () => {
@@ -225,22 +380,38 @@ test("does not mutate its input; non-object input is returned as-is", () => {
 });
 
 test("idempotent: normalizing twice equals normalizing once (notes not duplicated)", () => {
-  const messy = base({
-    event_scope: "single_company",
-    affected_tickers: [],
-    affected_sectors: ["Banking", "banking", "retail"],
-    sector_impacts: [
-      { sector: "PROPERTY", direction: "up" },
-      { sector: "property", direction: "positive" },
-      { sector: "retail", direction: "positive" },
-      null,
-      { sector: "banking", direction: "Positive", extra: "x" },
-    ],
-  });
-  const once = normalizeAgent1Output(messy, HELD);
-  const twice = normalizeAgent1Output(once, HELD);
-  assert.deepEqual(twice, once);
-  assert.ok(once.normalization_notes.length > 0);
+  const messies = [
+    base({
+      event_scope: "single_company",
+      affected_tickers: [],
+      affected_sectors: ["Banking", "banking", "retail"],
+      sector_impacts: [
+        { sector: "PROPERTY", direction: "up" },
+        { sector: "property", direction: "positive" },
+        { sector: "retail", direction: "positive" },
+        null,
+        { sector: "banking", direction: "Positive", extra: "x" },
+      ],
+    }),
+    base({
+      event_scope: "Single_Company",
+      affected_tickers: ["CRC"],
+      affected_sectors: ["energy", "telecom"],
+      sector_impacts: [
+        { sector: "energy", direction: "neutral", reason: " x " },
+        { sector: "banking", direction: "positive", reason: "ก".repeat(MAX_SECTOR_REASON_CHARS * 2) },
+        { sector: "property", direction: "negative", reason: "" },
+        { sector: "technology", direction: "neutral" },
+        { sector: "transport", direction: "negative", reason: 1 },
+      ],
+    }),
+  ];
+  for (const messy of messies) {
+    const once = normalizeAgent1Output(messy, HELD, HELD_TICKERS);
+    const twice = normalizeAgent1Output(once, HELD, HELD_TICKERS);
+    assert.deepEqual(twice, once);
+    assert.ok(once.normalization_notes.length > 0);
+  }
 });
 
 // --- Integration with findAffectedClients -------------------------------------------
@@ -312,6 +483,30 @@ test("integration (b): rate hike — banking positive, property negative", () =>
   });
   // Gross exposure: +0.4 and −0.3 both count.
   assert.equal(out.find((c) => c.clientId === "MIXED").priorityScore, 0.7);
+});
+
+test("integration (d): FOMC-style — a client whose matched sectors are all neutral is not matched", () => {
+  const out = run(
+    base({
+      sentiment: "negative",
+      event_scope: "systemic",
+      affected_sectors: ["banking", "property", "energy", "telecom"],
+      sector_impacts: [
+        { sector: "banking", direction: "positive", reason: "r" },
+        { sector: "property", direction: "negative", reason: "r" },
+        { sector: "energy", direction: "neutral" },
+        { sector: "telecom", direction: "neutral" },
+      ],
+    }),
+  );
+  // TELECOM_ONLY holds only a neutral sector -> gone. MIXED keeps its
+  // non-neutral holdings only, so its gross score shrinks accordingly.
+  assert.deepEqual(holdingsOf(out), {
+    CPN_HOLDER: ["CPN:sector:negative"],
+    OTHER_PROPERTY: ["LH:sector:negative"],
+    MIXED: ["KBANK:sector:positive", "SPALI:sector:negative"],
+  });
+  assert.equal(out.find((c) => c.clientId === "CPN_HOLDER").priorityScore, 0.5);
 });
 
 test("integration (c): sector omitted from affected_sectors but in sector_impacts is still matched", () => {

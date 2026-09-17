@@ -335,6 +335,70 @@ test("factcheck payload with normalized Phase 3 fields passes; malformed ones ->
   }
 });
 
+test("temperature sent to Anthropic is 0 for Agent 1 and Agent 2 (and unchanged 0 for Agent 3)", async () => {
+  const bodies = [
+    impactBody(),
+    { agent: "factcheck", news: n006, agent1Output: n006Run.analysis },
+    { agent: "script", analysis: n006Run.analysis, client: n006Run.affectedClients[0] },
+  ];
+  for (const body of bodies) {
+    fetchCalls = [];
+    const out = await call({ body });
+    assert.equal(out.status, 200, body.agent);
+    assert.equal(JSON.parse(fetchCalls[0].init.body).temperature, 0, body.agent);
+  }
+});
+
+test("sector_impacts reason: optional bounded string on factcheck and script payloads", async () => {
+  const withImpacts = (sector_impacts) => ({
+    ...n006Run.analysis,
+    event_scope: "systemic",
+    sector_impacts,
+  });
+  const client = n006Run.affectedClients[0];
+  for (const impacts of [
+    [{ sector: "banking", direction: "negative" }],
+    [{ sector: "banking", direction: "negative", reason: "ก".repeat(300) }],
+  ]) {
+    fetchCalls = [];
+    const fc = await call({ body: { agent: "factcheck", news: n006, agent1Output: withImpacts(impacts) } });
+    assert.equal(fc.status, 200, JSON.stringify(fc.body));
+    const sc = await call({ body: { agent: "script", analysis: withImpacts(impacts), client } });
+    assert.equal(sc.status, 200, JSON.stringify(sc.body));
+  }
+  fetchCalls = [];
+  for (const reason of ["ก".repeat(301), 5, ["r"]]) {
+    const bad = withImpacts([{ sector: "banking", direction: "negative", reason }]);
+    const expected = typeof reason === "string" ? 413 : 400;
+    assertRejected(await call({ body: { agent: "factcheck", news: n006, agent1Output: bad } }), expected);
+    assertRejected(await call({ body: { agent: "script", analysis: bad, client } }), expected);
+  }
+});
+
+test("script prompt carries the sector reason for each matched holding's sector", async () => {
+  const analysis = {
+    ...n006Run.analysis,
+    sector_impacts: [
+      { sector: "banking", direction: "positive", reason: "ดอกเบี้ยสูงขึ้นขยายส่วนต่างดอกเบี้ย" },
+      { sector: "property", direction: "negative" },
+    ],
+  };
+  const client = {
+    name: "คุณทดสอบ",
+    riskProfile: "moderate",
+    matchedHoldings: [
+      { ticker: "KBANK", name: "ธนาคารกสิกรไทย", sector: "banking", direction: "positive" },
+      { ticker: "LH", name: "แลนด์ แอนด์ เฮ้าส์", sector: "property", direction: "negative" },
+    ],
+  };
+  fetchResponder = () => anthropicOk({ script: "เรียนคุณทดสอบ" });
+  const out = await call({ body: { agent: "script", analysis, client } });
+  assert.equal(out.status, 200);
+  const prompt = JSON.parse(fetchCalls[0].init.body).messages[0].content;
+  assert.match(prompt, /KBANK \(ธนาคารกสิกรไทย\) — direction: positive — sector mechanism: ดอกเบี้ยสูงขึ้นขยายส่วนต่างดอกเบี้ย/);
+  assert.match(prompt, /LH \(แลนด์ แอนด์ เฮ้าส์\) — direction: negative(?! — sector mechanism)/);
+});
+
 test("factcheck response passes through the Agent 2 guard; model-written notes discarded", async () => {
   fetchResponder = () =>
     anthropicOk({

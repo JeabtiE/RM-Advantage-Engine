@@ -28,11 +28,22 @@
 //         touching the committed cache, so a flaky API response can never
 //         silently corrupt the demo content. Gates are all-or-nothing across
 //         scenarios on purpose: a half-written cache is worse than a stale one.
+//
+// ACCEPTANCE (what must hold before the new cache is COMMITTED):
+//   1. Agent 2 returns is_valid: true for EVERY cached item (enforced — gate).
+//   2. A human reviews the before/after client-ranking diff this script prints
+//      for each regenerated item. A changed ranking is NOT a failure: agent
+//      output varies run to run even at temperature 0 (e.g. N006 healthcare
+//      tagged positive in one run and neutral — so not used for matching — in
+//      the next), so the reviewer decides whether the new order is acceptable
+//      for the demo. If it is not, discard the working-tree change (git) rather
+//      than committing it.
 
 import { writeFileSync } from "node:fs";
 import { analyzeImpact, factCheck, generateAllScripts } from "../src/utils/claudeAPI.js";
 import { findAffectedClients, buildHoldingsSummary } from "../src/utils/matching.js";
 import { mockNews } from "../src/data/mockNews.js";
+import { rankingDiff, formatRankingDiff } from "./rankingDiff.mjs";
 
 // The scenarios to freeze. expectDislocation is the verdict we VERIFIED is stable
 // for that news item across a 5x stress run — it is a gate, not a hint. If a
@@ -195,8 +206,17 @@ if (allProblems.length) die("verification failed:\n  - " + allProblems.join("\n 
 // at boot that every key here still exists in mockNews.
 // Freshly generated entries overlay preserved ones; key order follows
 // CACHED_SCENARIOS so the committed file diffs cleanly run to run.
-const preserved = only.length ? await loadExistingCache() : {};
+const previous = await loadExistingCache();
+const preserved = only.length ? previous : {};
 const regenerated = Object.fromEntries(results.map(({ entry }) => [entry.newsId, entry]));
+
+// Before/after ranking per regenerated item, printed BEFORE the file is written
+// so the reviewer sees what the demo will show (acceptance criterion 2 above).
+console.log("\nClient ranking changes (review before committing the new cache):");
+for (const { entry } of results) {
+  const rows = rankingDiff(previous[entry.newsId]?.affectedClients, entry.affectedClients);
+  console.log(formatRankingDiff(entry.newsId, rows));
+}
 const merged = { ...preserved, ...regenerated };
 const cache = Object.fromEntries(
   CACHED_SCENARIOS.filter((s) => merged[s.id]).map((s) => [s.id, merged[s.id]]),
@@ -246,5 +266,6 @@ const entries = Object.values(cache);
 const totalScripts = entries.reduce((n, e) => n + e.scripts.length, 0);
 console.log(
   `\n✓ Wrote ${entries.length}-scenario cache (${entries.map((e) => e.newsId).join(", ")}; ` +
-    `${totalScripts} scripts total) → src/data/cachedDemoRun.js\n`,
+    `${totalScripts} scripts total) → src/data/cachedDemoRun.js\n` +
+    `  Review the ranking diff above (and \`git diff src/data/cachedDemoRun.js\`) before committing.\n`,
 );

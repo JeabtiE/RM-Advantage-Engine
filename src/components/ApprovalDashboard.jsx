@@ -94,10 +94,13 @@ export default function ApprovalDashboard({ draft, onApprove, onReject }) {
   // runs predate them, so each piece renders only when present.
   const analysis = draft.analysis ?? {};
   const scope = SCOPE_META[analysis.event_scope];
-  const sectorDirections = new Map(
-    (Array.isArray(analysis.sector_impacts) ? analysis.sector_impacts : []).map(
-      (s) => [s.sector, s.direction],
-    ),
+  const sectorImpacts = Array.isArray(analysis.sector_impacts)
+    ? analysis.sector_impacts
+    : [];
+  const impactSectors = new Set(sectorImpacts.map((s) => s.sector));
+  // Sectors with no explicit impact keep the plain pill (cached runs: all of them).
+  const plainSectors = (draft.affectedSectors ?? []).filter(
+    (s) => !impactSectors.has(s),
   );
   const notes = Array.isArray(analysis.normalization_notes)
     ? analysis.normalization_notes
@@ -185,24 +188,44 @@ export default function ApprovalDashboard({ draft, onApprove, onReject }) {
           <p className="mt-3 text-sm leading-relaxed text-slate-700">
             {draft.reasoning}
           </p>
+          {/* Per-sector direction + reason when Agent 1 supplied them. Neutral
+              sectors are listed but, by server rule, do not select clients —
+              the label says so, since they are absent from affectedSectors. */}
+          {sectorImpacts.length > 0 && (
+            <ul className="mt-3 space-y-1.5">
+              {sectorImpacts.map((s) => {
+                const dir = DIRECTION_META[s.direction] ?? DIRECTION_META.neutral;
+                return (
+                  <li key={s.sector} className="text-xs">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className={`rounded-full px-2.5 py-0.5 ${dir.pill}`} title={dir.label}>
+                        {dir.arrow} {s.sector}
+                      </span>
+                      {s.direction === "neutral" && (
+                        <span className="text-[11px] text-slate-400">
+                          เป็นกลาง — ไม่ใช้จับคู่ลูกค้า
+                        </span>
+                      )}
+                    </div>
+                    {s.reason && (
+                      <p className="mt-0.5 pl-2.5 leading-relaxed text-slate-500">
+                        {s.reason}
+                      </p>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
           <div className="mt-3 flex flex-wrap gap-1.5">
-            {(draft.affectedSectors ?? []).map((s) => {
-              // Per-sector direction when Agent 1 supplied one; cached runs
-              // (and sectors without an entry) keep the plain neutral pill.
-              const dir = DIRECTION_META[sectorDirections.get(s)];
-              return (
-                <span
-                  key={s}
-                  className={`rounded-full px-2.5 py-0.5 text-xs ${
-                    dir ? dir.pill : "bg-slate-100 text-slate-600"
-                  }`}
-                  title={dir?.label}
-                >
-                  {dir ? `${dir.arrow} ` : ""}
-                  {s}
-                </span>
-              );
-            })}
+            {plainSectors.map((s) => (
+              <span
+                key={s}
+                className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-600"
+              >
+                {s}
+              </span>
+            ))}
             {(draft.affectedTickers ?? []).map((t) => (
               <span
                 key={t}

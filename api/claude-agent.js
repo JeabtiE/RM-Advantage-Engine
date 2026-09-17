@@ -133,6 +133,7 @@ affected_tickers is NOT a list of every holding in the affected sectors. For "sy
 ## Sector impacts — direction per sector
 For every sector you list, state which way THIS event pushes it. Mixed-direction events are normal and expected: a rate hike is positive for banking and negative for property at the same time. The top-level "sentiment" is only the net read; it must NOT override a per-sector direction — if banking is positive and property negative, say so in sector_impacts even if sentiment is "negative".
 Sector values in affected_sectors and sector_impacts must be EXACTLY the sector names that appear in the client holdings universe (the last item inside each parenthesis, e.g. "banking"), lowercase. Do not invent sectors. Every sector in sector_impacts must also appear in affected_sectors.
+Every sector_impacts entry needs a "reason": ONE short Thai sentence giving the mechanism that links this news to that sector's direction. Use only facts that appear in the news content or market outcome, plus general economic mechanisms (e.g. "ดอกเบี้ยที่สูงขึ้นเพิ่มต้นทุนการกู้ยืม"). Do not introduce figures, events or company facts that are not in the source, and use a mechanism that genuinely fits that sector (per the mappings above).
 
 ## Output
 Return ONLY a JSON object, no markdown fences, no prose around it, with exactly these keys:
@@ -141,7 +142,7 @@ Return ONLY a JSON object, no markdown fences, no prose around it, with exactly 
   "affected_sectors": [string],        // held sectors touched, per event_scope (see above)
   "sentiment": "positive" | "negative" | "neutral",   // net direction for affected holdings
   "event_scope": "systemic" | "sector" | "single_company",
-  "sector_impacts": [ { "sector": string, "direction": "positive" | "negative" | "neutral" } ],   // one entry per affected sector
+  "sector_impacts": [ { "sector": string, "direction": "positive" | "negative" | "neutral", "reason": string } ],   // one entry per affected sector; reason = one short Thai sentence (see above)
   "dislocation_detected": boolean,     // true only if actual reaction genuinely diverges from expected
   "dislocation_description": string,   // Thai. State (a) what was expected, (b) what actually happened, (c) the opportunity/confidence. Empty string if none.
   "reasoning": string                  // Thai, max 2 lines. The causal chain, not a news summary. For systemic events, it must justify the sectors you expanded to.
@@ -158,7 +159,11 @@ async function callClaude({ system, user, maxTokens = 1024 }) {
   const body = JSON.stringify({
     model: MODEL,
     max_tokens: maxTokens,
-    temperature: 0, // deterministic — demo reliability over variance
+    // 0 for all three agents. For Agent 1/2 this REDUCES run-to-run flips in
+    // per-sector direction (e.g. N006 healthcare positive vs neutral, which
+    // changes the client ranking) but does not eliminate them — the same input
+    // can still return a different classification.
+    temperature: 0,
     system,
     messages: [{ role: "user", content: user }],
   });
@@ -276,7 +281,11 @@ Analyze this event using the three-step dislocation methodology. Return the JSON
   // normalization_notes is OURS, not the model's: a model-authored note would be
   // shown to the CIO as if the server had written it.
   if (parsed && typeof parsed === "object") delete parsed.normalization_notes;
-  return normalizeAgent1Output(parsed, heldSectorsFromSummary(holdingsSummary));
+  return normalizeAgent1Output(
+    parsed,
+    heldSectorsFromSummary(holdingsSummary),
+    heldTickersFromSummary(holdingsSummary),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -310,19 +319,40 @@ export function heldSectorsFromSummary(holdingsSummary) {
   return sectors;
 }
 
+// heldTickersFromSummary — the ticker at the start of each summary line
+// ("TICKER (name, sector)"), uppercased.
+export function heldTickersFromSummary(holdingsSummary) {
+  const tickers = new Set();
+  for (const line of String(holdingsSummary ?? "").split("\n")) {
+    const m = line.match(/^\s*([^\s(]+)\s*\(/);
+    if (m) tickers.add(m[1].toUpperCase());
+  }
+  return tickers;
+}
+
+// One short Thai sentence per sector; the cap keeps a runaway reason from
+// bloating the CIO view and the Agent 2 / Agent 3 prompts it is forwarded into.
+export const MAX_SECTOR_REASON_CHARS = 300;
+
 // normalizeAgent1Output — pure; returns a new object, never mutates the input.
 // Idempotent: running it on its own output changes nothing and adds no notes
-// (existing notes are carried forward, not regenerated).
+// (existing notes are carried forward, not regenerated; notes about a condition
+// that persists after normalization are added only once).
 //
-// @param {object} output          parsed Agent 1 JSON
+// @param {object} output                 parsed Agent 1 JSON
 // @param {Iterable<string>} heldSectors  sectors the client book actually holds
-export function normalizeAgent1Output(output, heldSectors) {
+// @param {Iterable<string>} [heldTickers] tickers the book holds; when omitted,
+//                                        only an EMPTY single_company ticker list is noted
+export function normalizeAgent1Output(output, heldSectors, heldTickers) {
   if (!output || typeof output !== "object" || Array.isArray(output)) return output;
   const held = new Set([...(heldSectors ?? [])].map(normSector));
   const out = { ...output };
   const notes = Array.isArray(output.normalization_notes)
     ? output.normalization_notes.filter((n) => typeof n === "string")
     : [];
+  const noteOnce = (n) => {
+    if (!notes.includes(n)) notes.push(n);
+  };
 
   // A non-list here would make matching.js throw on .map — replace with [].
   for (const key of ["affected_tickers", "affected_sectors"]) {
@@ -332,8 +362,9 @@ export function normalizeAgent1Output(output, heldSectors) {
     }
   }
 
-  // affected_sectors: lowercase/trim, drop exact duplicates. Never remove a
-  // distinct sector — even one outside the book; matching simply won't hit it.
+  // affected_sectors: lowercase/trim, drop exact duplicates. A distinct sector
+  // is never removed — even one outside the book; matching simply won't hit it —
+  // with ONE exception below: a sector explicitly tagged neutral.
   if (Array.isArray(out.affected_sectors)) {
     const before = out.affected_sectors;
     const cleaned = [...new Set(before.filter((s) => typeof s === "string").map(normSector))].filter(Boolean);
@@ -373,20 +404,55 @@ export function normalizeAgent1Output(output, heldSectors) {
         } else if (entry.direction !== direction || entry.sector !== sector) {
           notes.push(`ปรับรูปแบบ sector_impacts "${sector}" เป็นตัวพิมพ์เล็ก`);
         }
-        // Only { sector, direction } survive — extra keys never reach matching.
-        kept.push({ sector, direction });
+
+        // reason: trimmed and capped. A non-neutral entry WITHOUT a reason is
+        // kept — dropping it would silently remove that sector's clients — and
+        // flagged for the CIO instead (Agent 2 also treats it as blocking).
+        let reason;
+        if (typeof entry.reason === "string") {
+          reason = entry.reason.trim();
+          if (reason.length > MAX_SECTOR_REASON_CHARS) {
+            reason = `${reason.slice(0, MAX_SECTOR_REASON_CHARS - 1)}…`;
+            notes.push(`ตัดเหตุผลของ "${sector}" ให้ยาวไม่เกิน ${MAX_SECTOR_REASON_CHARS} ตัวอักษร`);
+          }
+        } else if (entry.reason !== undefined) {
+          notes.push(`ตัดเหตุผลของ "${sector}" ที่ไม่ใช่ข้อความออก`);
+        }
+        if (!reason && direction !== "neutral") {
+          noteOnce(`sector "${sector}" (${direction}) ไม่มีเหตุผลประกอบ (reason) — โปรดตรวจสอบก่อนอนุมัติ`);
+        }
+
+        // Only { sector, direction, reason } survive — extra keys never reach matching.
+        kept.push(reason ? { sector, direction, reason } : { sector, direction });
       }
       out.sector_impacts = kept;
 
-      // Union: a sector with a stated impact must be matchable.
+      // Union: a sector with a stated NON-neutral impact must be matchable.
+      // Neutral entries are skipped here and removed below, so the union can
+      // never (re-)add a sector that is not supposed to drive matching.
       const affected = Array.isArray(out.affected_sectors) ? [...out.affected_sectors] : [];
-      for (const { sector } of kept) {
-        if (!affected.includes(sector)) {
+      for (const { sector, direction } of kept) {
+        if (direction !== "neutral" && !affected.includes(sector)) {
           affected.push(sector);
           notes.push(`เพิ่ม "${sector}" เข้า affected_sectors ให้ตรงกับ sector_impacts (มิฉะนั้นลูกค้ากลุ่มนี้จะหลุดจากรายชื่อ)`);
         }
       }
-      if (kept.length > 0 || Array.isArray(out.affected_sectors)) out.affected_sectors = affected;
+
+      // The one exception to "never remove from affected_sectors": a sector the
+      // model EXPLICITLY tagged neutral does not drive client matching (live
+      // 2026-09-17: neutral energy/technology/healthcare put all 10 clients on
+      // an FOMC call list). The entry stays in sector_impacts for display.
+      // Sectors with no sector_impacts entry are untouched (matching falls back
+      // to top-level sentiment), and ticker matches are unaffected.
+      const neutral = new Set(kept.filter((k) => k.direction === "neutral").map((k) => k.sector));
+      const removed = affected.filter((s) => neutral.has(s));
+      if (removed.length > 0) {
+        notes.push(
+          `นำ sector ที่เป็นกลาง (neutral) ออกจาก affected_sectors: ${removed.join(", ")} — ไม่ใช้จับคู่ลูกค้า`,
+        );
+      }
+      const finalAffected = affected.filter((s) => !neutral.has(s));
+      if (kept.length > 0 || Array.isArray(out.affected_sectors)) out.affected_sectors = finalAffected;
     }
   }
 
@@ -402,13 +468,19 @@ export function normalizeAgent1Output(output, heldSectors) {
     }
   }
 
-  // A single-company event with no ticker would match no client at all.
-  const tickers = Array.isArray(out.affected_tickers) ? out.affected_tickers : [];
-  if (out.event_scope === "single_company" && tickers.length === 0) {
-    out.event_scope = "sector";
-    notes.push(
-      "เปลี่ยน event_scope จาก single_company เป็น sector — ไม่มีหุ้นที่ลูกค้าถือใน affected_tickers จึงจะไม่จับคู่ลูกค้ารายใดเลย",
-    );
+  // single_company is NEVER rewritten to another scope: widening it would bring
+  // back exactly the sector sweep the scope exists to prevent. If no listed
+  // ticker is held, the client list will be empty — explain that instead.
+  if (out.event_scope === "single_company") {
+    const tickers = (Array.isArray(out.affected_tickers) ? out.affected_tickers : [])
+      .map((t) => String(t).trim().toUpperCase());
+    const heldT = heldTickers ? new Set([...heldTickers].map((t) => String(t).toUpperCase())) : null;
+    const anyHeld = heldT ? tickers.some((t) => heldT.has(t)) : tickers.length > 0;
+    if (!anyHeld) {
+      noteOnce(
+        "ข่าวรายบริษัท (single_company) แต่ไม่มีลูกค้ารายใดถือหุ้นของบริษัทที่ระบุ — จึงไม่มีลูกค้าในรายชื่อ",
+      );
+    }
   }
 
   out.normalization_notes = notes;
@@ -431,7 +503,12 @@ const AGENT2_SYSTEM_PROMPT = `You are a compliance-minded fact checker on a Thai
 2. Sentiment direction — does the sentiment match the news? Flag an obvious contradiction (e.g. clearly negative news labelled "positive").
 3. Narrative grounding — is the reasoning / dislocation_description built on facts (numbers, price moves, events) that actually appear in the news content or market outcome? Flag an invented number, a price move the outcome does not describe, or a named precedent/reference case that does not appear in the source (e.g. a dated historical analogy). Second-order causal reasoning FROM the source facts is allowed (see below) — flag only fabricated facts, not inferences drawn from real ones.
 4. Event scope — if event_scope is present, is it consistent with the news text? "single_company" = the news is about one named company; "sector" = about one industry as a whole; "systemic" = macro / market-wide (rates, tariffs, FX, risk-off). Flag a clear mismatch (e.g. a central-bank rate decision labelled "single_company", or one company's deal labelled "systemic").
-5. Sector directions — if sector_impacts is present, is each direction supported by, or reasonably inferred from, the news content or market outcome? Mixed directions are legitimate (a rate hike can be positive for banking and negative for property). Flag a direction only when the source contradicts it (e.g. the text says property benefits but the direction is "negative") or when nothing in the source gives it any causal basis. Do not flag WHICH sectors are listed — only the direction given for each.
+5. Sector directions and reasons — if sector_impacts is present, check every entry whose direction is "positive" or "negative" (skip "neutral" entries). Mixed directions are legitimate (a rate hike can be positive for banking and negative for property). Flag the entry as a blocking issue if ANY of these hold:
+   - its "reason" is missing or empty;
+   - the reason or direction contradicts the news content or market outcome (e.g. the text says property benefits but the direction is "negative");
+   - the reason introduces factual claims not present in the source (figures, events, company-specific facts);
+   - the reason describes a mechanism that does not fit that sector (e.g. calling a sector a "bond proxy" when that label belongs to other sectors, such as utilities/power).
+   A general, sector-appropriate economic mechanism (e.g. "higher rates raise borrowing costs" for property) is acceptable even though the source does not spell it out — do NOT flag it. Do not flag WHICH sectors are listed — only each entry's direction and reason.
 
 ## Verify against the provided source ONLY
 Judge every claim solely against the news content and market outcome given below. Your own background knowledge may be outdated or incomplete: never flag a name, title, date, figure, rate level, or event as wrong because it differs from what you remember. If the source states it, treat it as true for this check.
@@ -587,6 +664,7 @@ When the link is INDIRECT (the holding is caught in a broad move rather than hit
 ## Direction per holding — mixed exposure
 Each affected holding may be tagged with a direction: positive (the event tends to help it), negative (tends to hurt it), or neutral. Describe each holding's effect in the direction it is tagged — never call a "negative" holding a beneficiary or vice versa.
 When the client has BOTH positive and negative holdings, the script must mention both sides briefly (e.g. "หุ้น KBANK ในพอร์ตได้แรงหนุนจากดอกเบี้ยที่สูงขึ้น ขณะที่ LH อาจถูกกดดันจากต้นทุนสินเชื่อ"), still within the sentence limit. Presenting both sides is information, not a suggestion to rebalance — do not tell the client to shift between them.
+A holding may also carry a "sector mechanism": the approved, fact-checked reason this event moves that holding's sector. Use it to explain the effect on that holding in plain words. Do not add facts, figures or claims beyond it and the approved insight.
 
 ## Tone by risk profile
 Tone changes the framing, not the informational stance. Every profile stays non-directive.
@@ -651,10 +729,23 @@ function correctThaiTerms(text) {
 // We pass matchedHoldings so the script can name the client's actual exposure,
 // and riskProfile so the tone rules in the system prompt have something to key on.
 async function generateScript(analysis, client) {
-  // Direction is appended only when present — cached/older payloads lack it and
-  // must produce the exact same prompt as before.
+  // Direction and the sector's reason (looked up from the approved analysis by
+  // the holding's sector) are appended only when present — cached/older
+  // payloads lack them and must produce the exact same prompt as before.
+  const sectorReasons = new Map(
+    (Array.isArray(analysis.sector_impacts) ? analysis.sector_impacts : [])
+      .filter((s) => typeof s?.reason === "string" && s.reason)
+      .map((s) => [String(s.sector).toLowerCase(), s.reason]),
+  );
   const matchedTickers = (client.matchedHoldings ?? [])
-    .map((h) => `${h.ticker} (${h.name})${h.direction ? ` — direction: ${h.direction}` : ""}`)
+    .map((h) => {
+      const reason = sectorReasons.get(String(h.sector ?? "").toLowerCase());
+      return (
+        `${h.ticker} (${h.name})` +
+        (h.direction ? ` — direction: ${h.direction}` : "") +
+        (reason ? ` — sector mechanism: ${reason}` : "")
+      );
+    })
     .join(", ");
 
   const user = `APPROVED INSIGHT (already passed Four Eyes — convey it as information, do not re-analyze):
@@ -796,6 +887,28 @@ function validateAnalysis(a, field) {
   optionalString(a.reasoning, `${field}.reasoning`, {
     maxChars: MAX_PROMPT_FIELD_CHARS,
   });
+  // Phase 3 fields — optional (the endpoint only ever returns them normalized,
+  // and older analyses lack them), strict when present. Checked for BOTH the
+  // factcheck and the script payload: sector reasons reach the Agent 3 prompt.
+  optionalEnum(a.event_scope, `${field}.event_scope`, EVENT_SCOPES);
+  if (a.sector_impacts !== undefined) {
+    if (!Array.isArray(a.sector_impacts)) {
+      throw new RequestError(400, `invalid_request: ${field}.sector_impacts must be an array`);
+    }
+    a.sector_impacts.forEach((s, i) => {
+      const f = `${field}.sector_impacts[${i}]`;
+      requireObject(s, f);
+      requireString(s.sector, `${f}.sector`, { maxChars: MAX_PROMPT_FIELD_CHARS });
+      if (s.direction === undefined) {
+        throw new RequestError(400, `invalid_request: ${f}.direction is required`);
+      }
+      optionalEnum(s.direction, `${f}.direction`, DIRECTIONS);
+      optionalString(s.reason, `${f}.reason`, { maxChars: MAX_SECTOR_REASON_CHARS });
+    });
+  }
+  if (a.normalization_notes !== undefined) {
+    requireStringArray(a.normalization_notes, `${field}.normalization_notes`);
+  }
 }
 
 function validateAgent1Output(a) {
@@ -807,26 +920,6 @@ function validateAgent1Output(a) {
       400,
       "invalid_request: agent1Output.dislocation_detected must be a boolean",
     );
-  }
-  // Phase 3 fields — optional (the endpoint only ever returns them normalized,
-  // and older analyses lack them), strict when present.
-  optionalEnum(a.event_scope, "agent1Output.event_scope", EVENT_SCOPES);
-  if (a.sector_impacts !== undefined) {
-    if (!Array.isArray(a.sector_impacts)) {
-      throw new RequestError(400, "invalid_request: agent1Output.sector_impacts must be an array");
-    }
-    a.sector_impacts.forEach((s, i) => {
-      const f = `agent1Output.sector_impacts[${i}]`;
-      requireObject(s, f);
-      requireString(s.sector, `${f}.sector`, { maxChars: MAX_PROMPT_FIELD_CHARS });
-      optionalEnum(s.direction, `${f}.direction`, DIRECTIONS);
-      if (s.direction === undefined) {
-        throw new RequestError(400, `invalid_request: ${f}.direction is required`);
-      }
-    });
-  }
-  if (a.normalization_notes !== undefined) {
-    requireStringArray(a.normalization_notes, "agent1Output.normalization_notes");
   }
 }
 
@@ -853,6 +946,8 @@ function validateClient(c) {
       // is interpolated into the Agent 3 prompt, so it must be a known token.
       optionalEnum(h.direction, `${f}.direction`, DIRECTIONS);
       optionalEnum(h.matchedBy, `${f}.matchedBy`, MATCHED_BY);
+      // sector keys the lookup of the analysis' sector reason for Agent 3.
+      optionalString(h.sector, `${f}.sector`, { maxChars: MAX_PROMPT_FIELD_CHARS });
     });
   }
 }

@@ -84,10 +84,21 @@ and that is exactly what the RM should explain — so the client still ranks by
 total exposure. Direction is shown to the CIO (▲/▼ per ticker) and passed to
 Agent 3; it does not change the ranking.
 
-**Known gap:** a sector tagged `neutral` still matches and still counts toward
-the score, so a client with only neutral holdings can rank at 100% (seen live on
-a Fed-hike fixture, 2026-09-17). Whether neutral-only matches should be dropped
-or down-ranked is an open prioritization decision.
+**Neutral sectors do not select clients.** Server-side normalization removes any
+sector Agent 1 explicitly tagged `neutral` from `affected_sectors` before
+matching (fixing a live case where a Fed-hike fixture put a client at 100% on
+neutral-only holdings). A holding in a neutral sector still counts if it matched
+by **ticker** (the company was named). Sectors with no explicit direction keep
+matching and inherit the top-level sentiment.
+
+**Ranking is not stable run to run.** Because a sector moving between
+`positive`/`negative` and `neutral` changes which holdings count, the same news
+can re-rank clients between live runs even at `temperature: 0`. Documented case:
+N006 tariff/gold — healthcare `positive` in one run, `neutral` in the next, so
+BDMS/BH/BCH weight dropped out and C008, C010, C001 and C004 moved down (same 10
+clients). This is accepted. When the demo cache is regenerated, the regen script
+prints a before/after ranking diff for human review; an unchanged ranking is not
+required — Agent 2 `is_valid: true` on every cached item is.
 
 ## Secondary factors (manual — CIO/RM judgment)
 

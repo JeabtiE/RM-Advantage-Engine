@@ -139,12 +139,21 @@ canonical Tariff case. Agent 2's scope is deliberately narrowed to the claims it
 | `sentiment` direction | Agent 1 narrative | **Yes** — verify against news |
 | `reasoning` grounding (numbers, price moves, named precedents) | Agent 1 narrative | **Yes** — flag invented facts / dated reference cases |
 | `event_scope` | Agent 1 classification | **Yes** — is it consistent with the news text? (§7) |
-| `sector_impacts[].direction` | Agent 1 narrative | **Yes** — flag only a direction the source contradicts or gives no causal basis for |
+| `sector_impacts[].direction` + `reason` (non-neutral entries) | Agent 1 narrative | **Yes** — blocking if the reason is missing, contradicts the source, adds facts not in the source, or uses a mechanism that does not fit the sector |
 | `affected_tickers`, `affected_sectors`, *which* sectors appear in `sector_impacts` | Agent 1 mapping → `matching.js` | **No** — expected expansion, judged by the deterministic matcher, not the fact checker |
 
 Rule of thumb: the fact check verifies the **story** (is the dislocation real,
 is the direction right, are the facts invented?), not the **tagging** (which
 tickers/sectors) — the tagging is deterministic downstream and needs no LLM sign-off.
+
+**Sector reasons — what is and is not a problem.** A general, sector-appropriate
+economic mechanism ("higher rates raise borrowing costs" for property) is fine
+even though the news does not spell it out. A mechanism attached to the wrong
+sector is not: "bond proxy" fits telecom (stable cash flows, high dividends, high
+leverage) and utilities, but not transport — the Phase 3.1 live run called
+transport a bond proxy; the Phase 3.2 run's transport reason (heavily indebted
+infrastructure operators) and telecom-as-bond-proxy are both sound. Neutral
+entries are not checked.
 
 **Source-only verification.** Agent 2 judges claims only against the provided
 news content and market outcome. It must never flag a name, date, figure or
@@ -170,10 +179,21 @@ states a direction per sector. Both feed `matching.js`.
 | `sector` | News about one industry as a whole | That sector only — no second-order sectors |
 | `systemic` | Macro / market-wide (rates, tariffs, FX, oil shocks, risk-off) | Second-order expansion via the §4 mappings, justified in `reasoning` |
 
-- **`sector_impacts`** — one `{ sector, direction }` per affected sector, using
-  only the held sectors from the holdings summary. Mixed directions are normal: a
-  rate hike is `banking: positive`, `property: negative` at once (§4 rule of
-  thumb). Top-level `sentiment` is only the net read and never overrides them.
+- **`sector_impacts`** — one `{ sector, direction, reason }` per affected
+  sector, using only the held sectors from the holdings summary. Mixed directions
+  are normal: a rate hike is `banking: positive`, `property: negative` at once
+  (§4 rule of thumb). Top-level `sentiment` is only the net read and never
+  overrides them. `reason` is one short Thai sentence giving the mechanism —
+  only facts from the news / market outcome plus general economic mechanisms,
+  and a mechanism that fits that sector (§4). It is shown to the CIO under each
+  sector and passed to Agent 3 as the holding's "sector mechanism".
+- **`neutral` means "does not select clients".** A sector tagged neutral is
+  listed for the reviewer but removed from matching (below).
+- **Stability** — Agents 1 and 2 run at `temperature: 0`, which reduces but does
+  not eliminate flips. N006 healthcare was `positive` in one live run and
+  `neutral` in the next, which re-ranked four clients (see CLAUDE.md → Known
+  Limitations → ranking variance). Accepted; a cache regen shows a ranking diff
+  for human review instead of requiring an identical ranking.
 - **Ticker discipline** — for `systemic` / `sector` events, `affected_tickers`
   lists only companies named in the news or with company-specific exposure stated
   in the reasoning. Sector-wide exposure belongs in `affected_sectors` /
@@ -186,10 +206,17 @@ states a direction per sector. Both feed `matching.js`.
 consistent before matching, and lists every change in `normalization_notes` for
 the CIO:
 - sector strings lowercased/trimmed; unheld or malformed `sector_impacts` entries
-  dropped; unknown direction → `neutral`; duplicate sector → first entry wins;
-- **union** — every `sector_impacts` sector is added to `affected_sectors`
-  (otherwise its holders would silently drop off the call list); sectors are never
-  removed, and no direction is invented for a sector without one;
+  dropped; invalid direction → `neutral`; duplicate sector → first entry wins;
+- **reason** — trimmed, capped at 300 chars; a non-neutral entry with a missing or
+  blank reason is **kept** (dropping it would silently remove clients) and noted;
+- **union** — every non-neutral `sector_impacts` sector is added to
+  `affected_sectors` (otherwise its holders would silently drop off the call
+  list); no direction is invented for a sector without one;
+- **neutral removal** — then every sector with an explicit neutral entry is
+  removed from `affected_sectors` (the one case where a sector is removed); the
+  entry stays in `sector_impacts` for display. Sectors without an entry are
+  untouched, and a named ticker in a neutral sector still matches by ticker;
 - invalid `event_scope` → removed (matching treats it as `systemic`);
-- `single_company` with an **empty** `affected_tickers` → `sector`, since it would
-  match no client (a non-empty list of unheld tickers is not downgraded).
+- **`single_company` is never rewritten** to another scope — widening it would
+  re-create the sector sweep. If no listed ticker is held (or the list is empty),
+  the client list is empty and a note tells the CIO why.

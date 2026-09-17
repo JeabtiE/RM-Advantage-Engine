@@ -147,7 +147,7 @@ Output:
   "affected_sectors": [],
   "sentiment": "positive|negative|neutral",
   "event_scope": "systemic|sector|single_company",
-  "sector_impacts": [{ "sector": "banking", "direction": "positive|negative|neutral" }],
+  "sector_impacts": [{ "sector": "banking", "direction": "positive|negative|neutral", "reason": "one short Thai sentence" }],
   "dislocation_detected": true,
   "dislocation_description": "ทองลง 2.3% ทั้งที่ควรขึ้นในภาวะ risk-off — อาจเป็นโอกาสสะสม",
   "reasoning": "max 2 lines"
@@ -160,42 +160,63 @@ Output:
 - **sector_impacts** — one entry per affected sector. Sectors must be the held
   sectors from the holdings summary. Mixed directions are expected (a rate hike:
   banking positive, property negative); top-level `sentiment` is the net read and
-  never overrides a per-sector direction.
+  never overrides a per-sector direction. Each entry carries a `reason`: one short
+  Thai sentence giving the mechanism, using only facts from the news /
+  marketOutcome plus general economic mechanisms, and a mechanism that fits that
+  sector.
+- **Temperature** — all three agents are called at `temperature: 0`. For Agents
+  1/2 this reduces, but does not eliminate, run-to-run classification flips (see
+  Known Limitations → ranking variance).
 - **Ticker discipline** — for `systemic` / `sector` events, `affected_tickers`
   holds only companies named in the news or with company-specific exposure stated
   in the reasoning; sector-wide exposure goes in `affected_sectors` /
   `sector_impacts`. Prompt guidance only — there is deliberately no server-side
   ticker cap (a cap would silently drop a legitimately named company).
 
-**`normalizeAgent1Output(output, heldSectors)`** (pure, idempotent; held sectors
-are read from the same holdings summary Agent 1 saw):
+**`normalizeAgent1Output(output, heldSectors, heldTickers)`** (pure, idempotent;
+held sectors and tickers are read from the same holdings summary Agent 1 saw):
 - Lowercases/trims every sector string; exact duplicates in `affected_sectors` collapse.
 - Non-array `affected_tickers` / `affected_sectors` → `[]` (matching.js would throw).
 - `sector_impacts`: non-array → removed; entries without a sector, or for a
-  sector the book doesn't hold → dropped; unknown direction → `"neutral"`;
-  duplicate sector → first entry wins; extra keys stripped.
-- **Union:** every `sector_impacts` sector is added to `affected_sectors` (matching
-  decides sector matches from `affected_sectors` only, so an omission would
-  silently drop those clients). Sectors are never removed from `affected_sectors`,
-  and no `sector_impacts` entry is invented for a sector that lacks one (matching
-  falls back to top-level `sentiment`).
+  sector the book doesn't hold → dropped; invalid/missing direction →
+  `"neutral"` (so it also stops driving matching, below); duplicate sector →
+  first entry wins; only `sector`, `direction`, `reason` are kept.
+- **reason:** trimmed and capped at `MAX_SECTOR_REASON_CHARS` (300, truncated
+  with "…" and noted); a non-string reason is removed with a note. A
+  **non-neutral entry with a missing/blank reason is KEPT** (dropping it would
+  silently remove that sector's clients) and gets a note naming the sector.
+- **Union:** every NON-neutral `sector_impacts` sector is added to
+  `affected_sectors` (matching decides sector matches from `affected_sectors`
+  only, so an omission would silently drop those clients). No entry is invented
+  for a sector that lacks one (matching falls back to top-level `sentiment`).
+- **Neutral removal (the one exception to "never remove from affected_sectors"):**
+  after the union, any sector with an explicit `neutral` entry is removed from
+  `affected_sectors` — neutral sectors do not select clients. The entry stays in
+  `sector_impacts` for display; a note names the removed sectors. Sectors with no
+  `sector_impacts` entry are untouched (cached runs unaffected), and a named
+  ticker in a neutral sector still matches by ticker.
 - Invalid `event_scope` → field removed (matching defaults to `systemic`).
-- `event_scope: "single_company"` with an **empty** `affected_tickers` → changed to
-  `"sector"` (it would otherwise match no client). Note: a non-empty list of
-  tickers nobody holds is NOT downgraded.
-- Every change is recorded in `normalization_notes` (Thai, shown to the CIO).
-  Model-written `normalization_notes` are discarded before normalizing, and the
-  notes are never sent to Agent 2.
+- **`single_company` is never changed to another scope.** If `affected_tickers`
+  is empty or none of its tickers is held, the scope stays (the client list will
+  be empty) and a note explains that no client holds the named company.
+- Every change is recorded in `normalization_notes` (Thai, shown to the CIO);
+  notes for conditions that persist after normalization are added once, so a
+  second pass adds nothing. Model-written `normalization_notes` are discarded
+  before normalizing, and the notes are never sent to Agent 2.
 
 ### Agent 2 — Fact Checker
 Input: original news + Agent 1 output (minus `normalization_notes`)
 Output: `{ "is_valid": bool, "flagged_issues": [], "adjusted_reasoning": "" }`
 
 Checks: (1) dislocation honesty, (2) sentiment direction, (3) narrative grounding,
-(4) `event_scope` consistent with the news text, (5) each `sector_impacts`
-direction supported by — or reasonably inferred from — the news/marketOutcome
-(flag only a contradicted or baseless direction; never flag WHICH sectors or
-tickers were listed — that stays out of scope, see the dislocation-analysis skill §6).
+(4) `event_scope` consistent with the news text, (5) for each NON-neutral
+`sector_impacts` entry, a blocking issue if the `reason` is missing, contradicts
+the source, introduces facts not in the source (figures, events, company facts),
+or uses a mechanism that does not fit that sector (e.g. "bond proxy" for
+transport — that label fits telecom/utilities, not transport). A general,
+sector-appropriate economic mechanism is acceptable and is not flagged. Never
+flag WHICH sectors or tickers were listed — that stays out of scope (see the
+dislocation-analysis skill §6).
 - **Source-only verification:** judge claims only against the provided news
   content and marketOutcome; never flag a name, date, figure or event as wrong
   from background knowledge, which may be outdated.
@@ -217,8 +238,14 @@ Output: `{ "script": "Thai, max 3 sentences, informational tone, NEVER directive
 - Each holding is described in its tagged direction; a client with both positive
   and negative holdings gets both sides mentioned briefly (still no rebalancing
   suggestion).
-- Endpoint validation: `matchedHoldings[].direction` ∈ positive|negative|neutral
-  and `matchedBy` ∈ ticker|sector when present (optional — cached runs lack them).
+- Each holding line also carries its sector's approved `reason` as a "sector
+  mechanism" (looked up from `analysis.sector_impacts` by the holding's
+  `sector`); the script uses it to explain the effect and adds no new facts.
+  Holdings without direction/reason produce the same prompt text as before.
+- Endpoint validation: `matchedHoldings[].direction` ∈ positive|negative|neutral,
+  `matchedBy` ∈ ticker|sector and `sector` a bounded string when present;
+  `analysis.sector_impacts[].reason` an optional string ≤ 300 chars (optional —
+  cached runs lack all of these).
 
 ### Matching output (deterministic, matching.js)
 `findAffectedClients()` returns each affected client with `matchedHoldings`
@@ -227,7 +254,8 @@ Output: `{ "script": "Thai, max 3 sentences, informational tone, NEVER directive
 else `"neutral"`) and `priorityScore`.
 - `event_scope: "single_company"` → match by ticker only; otherwise ticker OR sector.
 - Missing/unknown scope → `systemic`. `sector_impacts` only sets direction; it
-  never widens the match set.
+  never widens the match set. (Neutral sectors are already removed from
+  `affected_sectors` by normalization, so they select no clients.)
 - **priorityScore is GROSS exposure** (`calculatePriority`, unchanged): positive
   and negative holdings both add weight, never netted — a client with offsetting
   exposures still needs an RM conversation.
@@ -275,14 +303,36 @@ clients** (C007, C003 — both hold CPN). The cached N006/N003 runs predate thes
 fields and behave exactly as before. The NewsFeed caveat is still shown; the
 README still lists the limitation.
 
-### Neutral sector impacts still match (known, not yet addressed)
+### Neutral sector impacts — addressed by normalization (Phase 3.2)
 
-A sector listed with `direction: "neutral"` is still in `affected_sectors`, so
-its holders match and their weight counts toward gross `priorityScore`. Live
-2026-09-17, FOMC fixture: energy/technology/healthcare were tagged neutral, so all
-10 clients matched and C002 ranked at 100% on neutral-only holdings. Not changed
-yet — it is a matching/prioritization design decision (drop neutral-only matches,
-or rank them lower).
+Found live 2026-09-17 (FOMC fixture): sectors tagged `neutral` still matched, so
+all 10 clients matched and C002 ranked at 100% on neutral-only holdings. Now
+`normalizeAgent1Output` removes explicitly neutral sectors from
+`affected_sectors` (matching.js unchanged), and the CIO view labels them
+"เป็นกลาง — ไม่ใช้จับคู่ลูกค้า".
+
+### Client ranking varies run to run (accepted)
+
+Agent 1's per-sector direction is not fully stable even at `temperature: 0`.
+Documented case — **N006 tariff/gold, healthcare**: tagged `positive` in the
+Phase 3.1 live run and `neutral` in the Phase 3.2 run. Neutral sectors do not
+drive matching, so in the second run BDMS/BH/BCH weight dropped out and four
+clients moved down (C008 #4→#8, C010 #5→#9, C001 #6→#7, C004 #9→#10; same 10
+clients, Agent 2 still `is_valid: true`). The committed cache is unaffected until
+a regen; a regen may legitimately change the on-screen ranking (decision: accept
+— see "Demo cache regeneration" below).
+
+### Demo cache regeneration — acceptance criteria
+
+`npm run regen:cache` (scripts/regenerateDemoCache.mjs) may only be committed when:
+1. **Agent 2 returns `is_valid: true` for every cached item** — enforced by the
+   script (along with the dislocation-verdict, script-count, generic-script and
+   typo gates).
+2. **A human has reviewed the before/after ranking diff** the script prints per
+   regenerated item (`scripts/rankingDiff.mjs`). A changed ranking is NOT a
+   failure (see ranking variance above); if the new order is unacceptable for the
+   demo, discard the working-tree change instead of committing it.
+A ranking identical to the previous cache is no longer required.
 
 ### Live mode cannot detect dislocation (by construction)
 
@@ -326,6 +376,9 @@ api/
                             (anything but "true" → 503 live_mode_disabled). Errors are { error: code } only.
   fetch-live-news.js      — Vercel serverless Yahoo Finance RSS proxy (CORS + .BK suffix)
 tests/                    — node:test suites (`npm test`); fetch is stubbed, never hits Anthropic
+scripts/
+  regenerateDemoCache.mjs — `npm run regen:cache`: live pipeline → cachedDemoRun.js (gated; prints ranking diff)
+  rankingDiff.mjs         — pure before/after ranking diff used by the regen script
 src/
   components/
     NewsFeed.jsx          — news selection (preset | live source switcher) + trigger analysis
