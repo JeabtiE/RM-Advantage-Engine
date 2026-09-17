@@ -4,3 +4,6 @@ dist
 .env.local
 *.local
 .DS_Store
+
+# Failed demo-cache regen runs (scripts/regenerateDemoCache.mjs): review, never commit
+.regen-failed/

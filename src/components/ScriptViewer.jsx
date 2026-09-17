@@ -196,9 +196,19 @@ function ScriptCard({ entry }) {
       </div>
 
       {entry.ok ? (
-        <p className="mt-3 whitespace-pre-line rounded-xl bg-slate-50 p-4 text-sm leading-relaxed text-slate-700">
-          {entry.script}
-        </p>
+        <>
+          <p className="mt-3 whitespace-pre-line rounded-xl bg-slate-50 p-4 text-sm leading-relaxed text-slate-700">
+            {entry.script}
+          </p>
+          {/* Server flagged it as over the character budget (the proxy for the
+              3-sentence rule). Shown in full — never truncated — so the RM can
+              shorten it on the call without losing a caveat. */}
+          {entry.length_exceeded && (
+            <p className="mt-2 text-[11px] text-amber-600">
+              สคริปต์ยาวเกินกำหนด ({entry.script?.length ?? 0} ตัวอักษร) — โปรดตัดให้กระชับก่อนใช้
+            </p>
+          )}
+        </>
       ) : (
         <p className="mt-3 rounded-xl bg-amber-50 p-4 text-sm text-amber-700">
           สร้างสคริปต์ไม่สำเร็จ: {entry.error}

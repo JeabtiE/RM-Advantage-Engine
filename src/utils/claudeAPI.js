@@ -202,6 +202,9 @@ export async function generateAllScripts(analysis, clients) {
         riskProfile: client.riskProfile,
         ok: true,
         script: outcome.value.script,
+        // Server flag: over MAX_SCRIPT_CHARS (never truncated). Only present
+        // when true, so cached entries keep their existing shape.
+        ...(outcome.value.length_exceeded === true ? { length_exceeded: true } : {}),
       };
     }
     return {

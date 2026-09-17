@@ -9,7 +9,9 @@
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 
-import handler from "../api/claude-agent.js";
+import { readFileSync } from "node:fs";
+
+import handler, { SECTOR_MECHANISM_TABLE, MAX_SCRIPT_CHARS } from "../api/claude-agent.js";
 import { mockNews } from "../src/data/mockNews.js";
 import { cachedDemoRuns } from "../src/data/cachedDemoRun.js";
 import { buildHoldingsSummary } from "../src/utils/matching.js";
@@ -347,6 +349,94 @@ test("temperature sent to Anthropic is 0 for Agent 1 and Agent 2 (and unchanged 
     assert.equal(out.status, 200, body.agent);
     assert.equal(JSON.parse(fetchCalls[0].init.body).temperature, 0, body.agent);
   }
+});
+
+// System prompt sent for one agent call (via the stubbed fetch).
+async function systemPromptFor(body) {
+  fetchCalls = [];
+  const out = await call({ body });
+  assert.equal(out.status, 200, body.agent);
+  return JSON.parse(fetchCalls[0].init.body).system;
+}
+
+test("Agent 1 and Agent 2 prompts carry the SAME shared sector table; the skill doc matches it", async () => {
+  const a1 = await systemPromptFor(impactBody());
+  const a2 = await systemPromptFor({ agent: "factcheck", news: n006, agent1Output: n006Run.analysis });
+  assert.ok(a1.includes(SECTOR_MECHANISM_TABLE), "Agent 1 prompt");
+  assert.ok(a2.includes(SECTOR_MECHANISM_TABLE), "Agent 2 prompt");
+  const skill = readFileSync(new URL("../skills/dislocation-analysis/SKILL.md", import.meta.url), "utf8")
+    .replace(/\r\n/g, "\n");
+  assert.ok(skill.includes("```text\n" + SECTOR_MECHANISM_TABLE + "\n```"), "skill doc §4 in sync");
+  assert.match(SECTOR_MECHANISM_TABLE, /Utilities \/ Power .*bond proxy/);
+  assert.match(SECTOR_MECHANISM_TABLE, /Telecom .*bond proxy/);
+});
+
+test("Agent 2 check 5 uses transport as the wrong-bond-proxy example and defers to the shared table", async () => {
+  const a2 = await systemPromptFor({ agent: "factcheck", news: n006, agent1Output: n006Run.analysis });
+  assert.match(a2, /calling transport a "bond proxy"/);
+  assert.match(a2, /Judge mechanisms against that table, not your own sector taxonomy/);
+  assert.ok(!a2.includes("such as utilities/power"), "old misleading example removed");
+});
+
+test("sentiment is defined as the expected pre-reaction impact in both prompts", async () => {
+  const a1 = await systemPromptFor(impactBody());
+  const a2 = await systemPromptFor({ agent: "factcheck", news: n006, agent1Output: n006Run.analysis });
+  assert.match(a1, /"sentiment" is the EXPECTED \(theoretical\) net impact/);
+  assert.match(a1, /belongs ONLY in dislocation_detected \/ dislocation_description/);
+  assert.match(a2, /Flag it ONLY if it is inconsistent with the sector_impacts directions/);
+  assert.match(a2, /NEVER flag sentiment for diverging from the actual market reaction when a dislocation is described/);
+});
+
+test("MAX_SCRIPT_CHARS = longest accepted cached script rounded up to the nearest 50", () => {
+  const lengths = Object.values(cachedDemoRuns).flatMap((r) =>
+    r.scripts.filter((s) => s.ok).map((s) => s.script.length),
+  );
+  const max = Math.max(...lengths);
+  assert.equal(max, 581);
+  assert.equal(MAX_SCRIPT_CHARS, Math.ceil(max / 50) * 50);
+  assert.equal(MAX_SCRIPT_CHARS, 600);
+});
+
+test("Agent 3 prompt states the character budget, the two-holding focus and fact/mechanism separation", async () => {
+  const a3 = await systemPromptFor({
+    agent: "script",
+    analysis: n006Run.analysis,
+    client: n006Run.affectedClients[0],
+  });
+  assert.match(a3, /Max 3 sentences AND at most 600 characters/);
+  assert.match(a3, /focus on at most TWO/);
+  assert.match(a3, /Reported facts vs mechanisms/);
+  assert.match(a3, /มีแนวโน้ม/);
+});
+
+test("over-long script is flagged length_exceeded and returned in full (never truncated)", async () => {
+  const client = n006Run.affectedClients[0];
+  const cases = [
+    { text: "ก".repeat(MAX_SCRIPT_CHARS), flagged: false },
+    { text: "ก".repeat(MAX_SCRIPT_CHARS + 1), flagged: true },
+    { text: "ข".repeat(MAX_SCRIPT_CHARS * 2), flagged: true },
+  ];
+  for (const { text, flagged } of cases) {
+    fetchCalls = [];
+    // The model also tries to set the flag itself — the server must ignore it.
+    fetchResponder = () => anthropicOk({ script: text, length_exceeded: !flagged });
+    const out = await call({ body: { agent: "script", analysis: n006Run.analysis, client } });
+    assert.equal(out.status, 200);
+    assert.equal(out.body.script, text, "script returned untruncated");
+    assert.equal(out.body.length_exceeded === true, flagged);
+    if (!flagged) assert.equal("length_exceeded" in out.body, false);
+  }
+});
+
+test("Agent 1 system prompt maps telecom as a rate-sensitive bond proxy", async () => {
+  const out = await call({ body: impactBody() });
+  assert.equal(out.status, 200);
+  const { system } = JSON.parse(fetchCalls[0].init.body);
+  assert.match(
+    system,
+    /Telecom \(ADVANC, TRUE, INTUCH\): interest rates — INVERSE \(bond proxy: stable cash flows, high dividends, high leverage\)/,
+  );
+  assert.match(system, /hurt property \/ utilities \/ telecom \/ rate-sensitive growth/);
 });
 
 test("sector_impacts reason: optional bounded string on factcheck and script payloads", async () => {

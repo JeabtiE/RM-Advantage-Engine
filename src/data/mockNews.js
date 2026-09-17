@@ -2,6 +2,7 @@
 // Each item embeds a marketOutcome field to enable dislocation detection:
 // Agent 1 compares what theory says SHOULD happen vs. what the market DID.
 // N006 is the Trump Tariff / Gold dislocation case — the demo money shot.
+// N007 is the September 2026 Fed rate hike (real market data; see its comment).
 
 export const mockNews = [
   {
@@ -83,6 +84,41 @@ export const mockNews = [
       "สินทรัพย์ปลอดภัยเหล่านี้ควรปรับตัวขึ้นในภาวะ risk-off การที่ทองคำร่วง " +
       "สวนทางกับที่ควรจะเป็น อาจสะท้อนแรงขายเพื่อเพิ่มสภาพคล่อง (margin call) " +
       "และอาจเป็นโอกาสสะสมทองคำที่ตลาดมองข้าม",
+  },
+  // N007 — Fed rate hike, September 16, 2026 (second cached scenario).
+  // Headline/content: the FOMC decision itself (English, as issued).
+  // marketOutcome: ONLY the team-supplied market data, figures exactly as given.
+  //   - SET close Sep 17 = 1,583.34, +20.61 pts (+1.32%), turnover 62,452.42 MB
+  //     (Krungthep Turakij). The implied Sep 16 close of 1,562.73 is DERIVED
+  //     from that change, not separately sourced, so it is not stated below.
+  //   - Most-active stocks are limited to tickers held in mockClients (all five
+  //     listed were held).
+  //   - Sector index changes (SETBANK, PROP, TRANS, ICT, ENERG, HELTH, ETRON) and
+  //     BOT USD/THB reference rates were not available, so they are omitted. The
+  //     only FX figure is the Sep 17 MORNING MARKET rate, labelled as such.
+  //   - The analyst view is attributed as reported commentary.
+  // It deliberately does not say whether a dislocation exists — Agent 1 decides.
+  {
+    id: "N007",
+    headline:
+      "Fed raises federal funds rate by 25 basis points to 3.75%-4.00%, first hike since July 2023",
+    content:
+      "The Federal Open Market Committee voted unanimously, 12-0, on September 16, 2026 " +
+      "to raise the target range for the federal funds rate by 25 basis points, from " +
+      "3.50%-3.75% to 3.75%-4.00%. It is the Fed's first rate increase since July 2023. " +
+      "The committee's dot plot signaled another possible hike later in 2026. Markets " +
+      "had largely priced in the move before the announcement.",
+    source:
+      "FOMC decision (Sep 16, 2026); ข้อมูลตลาด: กรุงเทพธุรกิจ (bangkokbiznews.com) รายงานภาวะตลาดปิด 17 ก.ย. 2026",
+    publishedAt: "2026-09-16T18:00:00Z",
+    marketOutcome:
+      "ดัชนี SET วันที่ 17 ก.ย. ปิดที่ 1,583.34 จุด เพิ่มขึ้น 20.61 จุด (+1.32%) " +
+      "มูลค่าการซื้อขาย 62,452.42 ล้านบาท หุ้นที่มีการซื้อขายมากที่สุด (most active) " +
+      "ได้แก่ DELTA ปิดที่ 240.00 (+3.00%) PTTEP 151.00 (-1.63%) KTB 45.00 (+1.12%) " +
+      "PTT 42.25 (+0.60%) และ BBL 193.00 (+0.52%) ค่าเงินบาทในตลาดช่วงเช้าวันที่ 17 ก.ย. " +
+      "อ่อนค่าลงมาที่ 33.38-33.40 บาทต่อดอลลาร์สหรัฐ (อัตราตลาดช่วงเช้า ไม่ใช่อัตราอ้างอิง " +
+      "ของ ธปท.) นักวิเคราะห์ระบุว่าการปรับขึ้นของตลาดมาจากแรงซื้อคืน หลังจากหุ้นได้ปรับตัวลง " +
+      "เพื่อสะท้อนทิศทางดอกเบี้ยของเฟดไปก่อนหน้าแล้ว",
   },
 ];
 

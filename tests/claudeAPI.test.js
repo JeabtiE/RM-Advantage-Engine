@@ -9,7 +9,7 @@
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 
-import { analyzeImpact, LIVE_MODE_DISABLED } from "../src/utils/claudeAPI.js";
+import { analyzeImpact, generateAllScripts, LIVE_MODE_DISABLED } from "../src/utils/claudeAPI.js";
 
 const realFetch = globalThis.fetch;
 let calls;
@@ -71,4 +71,20 @@ test("network failure IS retried (max 2 retries)", async () => {
   };
   await assert.rejects(analyzeImpact({}, ""), TypeError);
   assert.equal(calls, 3);
+});
+
+test("generateAllScripts carries length_exceeded only when the server set it", async () => {
+  stubFetch(() => {
+    const n = calls; // 1-based after increment
+    const body = n === 1 ? { script: "long", length_exceeded: true } : { script: "short" };
+    return new Response(JSON.stringify(body), { status: 200 });
+  });
+  const clients = [
+    { clientId: "A", name: "A", riskProfile: "moderate" },
+    { clientId: "B", name: "B", riskProfile: "moderate" },
+  ];
+  const out = await generateAllScripts({ sentiment: "neutral" }, clients);
+  assert.equal(out[0].length_exceeded, true);
+  assert.equal(out[0].script, "long");
+  assert.equal("length_exceeded" in out[1], false);
 });

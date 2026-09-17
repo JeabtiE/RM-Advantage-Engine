@@ -57,9 +57,10 @@ const byId = (clients) => Object.fromEntries(clients.map((c) => [c.clientId, c])
 
 // --- Backward compatibility ----------------------------------------------------
 
-test("regression: every cached Agent 1 output matches the v1 implementation", () => {
-  const outputs = Object.values(cachedDemoRuns).map((r) => r.analysis);
-  assert.ok(outputs.length >= 2, "expected the N006 and N003 cached analyses");
+test("regression: every pre-Phase-3 cached Agent 1 output matches the v1 implementation", () => {
+  // N006/N003 predate event_scope/sector_impacts (v1 shape); newer cached items
+  // (N007) carry them and are covered by the ranked-list test below instead.
+  const outputs = ["N006", "N003"].map((id) => cachedDemoRuns[id].analysis);
   for (const analysis of outputs) {
     assert.equal(analysis.event_scope, undefined, "cache predates event_scope");
     assert.equal(analysis.sector_impacts, undefined, "cache predates sector_impacts");
