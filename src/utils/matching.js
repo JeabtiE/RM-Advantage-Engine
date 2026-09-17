@@ -6,7 +6,8 @@
 // same Agent 1 output always yields the same ranked list — string matching must
 // never depend on an LLM (see CLAUDE.md hard constraint #6).
 //
-//   findAffectedClients() — match affected tickers/sectors to client holdings.
+//   findAffectedClients() — match affected tickers/sectors to client holdings
+//                           (event-scope gated, each match tagged with direction).
 //   calculatePriority()   — % of a client's portfolio hit by the matched holdings.
 //   buildHoldingsSummary() — compact holdings universe fed into Agent 1's prompt.
 //   filterRelevantNews()  — cheap pre-Agent-1 relevance floor (skips the API call).
@@ -84,32 +85,139 @@ export function calculatePriority(client, affectedHoldings) {
   );
 }
 
+/**
+ * Agent 1 output as consumed by findAffectedClients. `event_scope` and
+ * `sector_impacts` are OPTIONAL: Agent 1 starts emitting them in Phase 3, and
+ * the cached demo runs (cachedDemoRun.js) predate them, so matching must behave
+ * exactly as before when both are absent.
+ *
+ * @typedef {"positive" | "negative" | "neutral"} Direction
+ * @typedef {"systemic" | "sector" | "single_company"} EventScope
+ *
+ * @typedef {Object} SectorImpact
+ * @property {string} sector       - lowercase sector key, e.g. "banking"
+ * @property {Direction} direction - how this event moves that sector
+ *
+ * @typedef {Object} Agent1Output
+ * @property {string[]} affected_tickers
+ * @property {string[]} affected_sectors
+ * @property {Direction} sentiment               - net direction for affected holdings
+ * @property {boolean} dislocation_detected
+ * @property {string} dislocation_description
+ * @property {string} reasoning
+ * @property {EventScope} [event_scope]          - missing → "systemic"
+ * @property {SectorImpact[]} [sector_impacts]   - per-sector direction; missing → sentiment
+ */
+
+/**
+ * A matched holding: the client's holding plus why it matched and which way the
+ * event pushes it.
+ *
+ * @typedef {Object} MatchedHolding
+ * @property {string} ticker
+ * @property {string} name
+ * @property {string} sector
+ * @property {number} weight
+ * @property {"ticker" | "sector"} matchedBy - "ticker" wins when both match
+ * @property {Direction} direction
+ */
+
+const DIRECTIONS = new Set(["positive", "negative", "neutral"]);
+const EVENT_SCOPES = new Set(["systemic", "sector", "single_company"]);
+
+// Anything that isn't a known direction reads as "neutral" — a malformed value
+// from the model must degrade to "no directional claim", never throw mid-demo.
+function toDirection(value) {
+  const d = String(value ?? "").toLowerCase();
+  return DIRECTIONS.has(d) ? d : "neutral";
+}
+
+// Missing OR unrecognized scope → "systemic", the pre-Phase-3 behavior. Falling
+// back to the widest scope keeps an odd model response from silently dropping
+// clients; over-inclusion is visible to the CIO, omission is not.
+function toEventScope(value) {
+  const s = String(value ?? "").toLowerCase();
+  return EVENT_SCOPES.has(s) ? s : "systemic";
+}
+
+// sector → direction from sector_impacts. Malformed entries (not an object, no
+// non-empty string sector) are skipped; the first entry for a sector wins so a
+// duplicate can't flip the answer depending on order of evaluation elsewhere.
+function buildSectorDirections(sectorImpacts) {
+  const map = new Map();
+  if (!Array.isArray(sectorImpacts)) return map;
+  for (const entry of sectorImpacts) {
+    if (!entry || typeof entry !== "object") continue;
+    if (typeof entry.sector !== "string" || entry.sector.trim() === "") continue;
+    const sector = entry.sector.trim().toLowerCase();
+    if (!map.has(sector)) map.set(sector, toDirection(entry.direction));
+  }
+  return map;
+}
+
 // findAffectedClients — match Agent 1's output against every client's holdings.
-// A holding is affected if its ticker is in affected_tickers OR its sector is
-// in affected_sectors. Matching is case-insensitive (tickers upper, sectors
-// lower) so a stray-case Agent 1 response still matches. Returns ONLY clients
-// with at least one matched holding, each annotated with matchedHoldings and a
-// priorityScore. Caller sorts by priorityScore (the ClientList / test do this).
+//
+// Scope gate (event_scope):
+//   "systemic" / "sector" (and missing) — a holding matches if its ticker is in
+//     affected_tickers OR its sector is in affected_sectors (the original rule).
+//     The two scopes match identically today; the distinction is carried for
+//     Agent 1 / the reviewer, not used to narrow further.
+//   "single_company" — ticker only. Sector expansion is what over-included
+//     clients on single-company news (README Known Limitation #1): a CPN deal
+//     must not sweep in every property holder.
+//
+// Only affected_sectors decides whether a sector MATCHES; sector_impacts only
+// supplies its DIRECTION. Letting sector_impacts widen the match would reopen
+// the over-inclusion this gate exists to close.
+//
+// Direction per matched holding: the holding's sector in sector_impacts, else
+// the top-level sentiment, else "neutral". The same rule covers ticker matches
+// (their sector's direction if known) and sectors only listed in
+// affected_sectors (they inherit sentiment).
+//
+// Matching is case-insensitive (tickers upper, sectors lower) so a stray-case
+// Agent 1 response still matches. Returns ONLY clients with at least one matched
+// holding, each annotated with matchedHoldings and a priorityScore. Caller sorts
+// by priorityScore (useDraft / the regen script do this).
+//
+// @param {Agent1Output} agent1Output
+// @returns {Array<Object & { matchedHoldings: MatchedHolding[], priorityScore: number }>}
 export function findAffectedClients(agent1Output, clients = mockClients) {
   const tickers = new Set(
     (agent1Output?.affected_tickers ?? []).map((t) => String(t).toUpperCase()),
   );
-  const sectors = new Set(
-    (agent1Output?.affected_sectors ?? []).map((s) => String(s).toLowerCase()),
-  );
+  const scope = toEventScope(agent1Output?.event_scope);
+  const sectors =
+    scope === "single_company"
+      ? new Set()
+      : new Set(
+          (agent1Output?.affected_sectors ?? []).map((s) => String(s).toLowerCase()),
+        );
+  const sectorDirections = buildSectorDirections(agent1Output?.sector_impacts);
+  const fallbackDirection = toDirection(agent1Output?.sentiment);
 
   const affected = [];
   for (const client of clients) {
-    const matchedHoldings = client.holdings.filter(
-      (h) =>
-        tickers.has(String(h.ticker).toUpperCase()) ||
-        sectors.has(String(h.sector).toLowerCase()),
-    );
+    const matchedHoldings = [];
+    for (const h of client.holdings) {
+      const byTicker = tickers.has(String(h.ticker).toUpperCase());
+      const sector = String(h.sector).toLowerCase();
+      if (!byTicker && !sectors.has(sector)) continue;
+      matchedHoldings.push({
+        ...h,
+        matchedBy: byTicker ? "ticker" : "sector",
+        direction: sectorDirections.get(sector) ?? fallbackDirection,
+      });
+    }
     if (matchedHoldings.length === 0) continue;
 
     affected.push({
       ...client,
       matchedHoldings,
+      // GROSS exposure — positive and negative holdings both add weight, they are
+      // never netted. A client long banks (+) and property (−) on a rate hike may
+      // net to roughly zero P&L, but still needs an RM conversation: the mix
+      // inside the portfolio shifted, and that is exactly the insight to relay.
       priorityScore: calculatePriority(client, matchedHoldings),
     });
   }
@@ -156,8 +264,19 @@ const SECTOR_KEYWORDS = {
 // through second-order effects, so they count as relevant on their own —
 // independent of which sectors the text happens to name. This is what keeps the
 // Tariff case (N006) alive.
+//
+// rates also covers the US Fed: FOMC statements say "federal funds rate", not
+// "interest rate", so English Fed news was being screened out. "fed" is a short
+// ASCII term and will false-positive on phrases like "fed up" or "well-fed";
+// that is accepted — the filter is deliberately biased toward passing (see
+// above), and the cost of a false positive is one API call.
 const MACRO_KEYWORDS = {
-  rates: ["ดอกเบี้ย", "กนง.", "นโยบายการเงิน", "ธปท.", "ธนาคารแห่งประเทศไทย", "เงินเฟ้อ", "interest rate", "policy rate", "inflation"],
+  rates: [
+    "ดอกเบี้ย", "กนง.", "นโยบายการเงิน", "ธปท.", "ธนาคารแห่งประเทศไทย", "เงินเฟ้อ",
+    "เฟด", "ธนาคารกลางสหรัฐ",
+    "interest rate", "policy rate", "inflation",
+    "fed", "fomc", "federal funds", "federal reserve", "rate hike", "rate cut",
+  ],
   fx_trade: ["ค่าเงินบาท", "เงินบาท", "บาทแข็ง", "บาทอ่อน", "ส่งออก", "นำเข้า", "ภาษีนำเข้า", "ภาษีศุลกากร", "กำแพงภาษี", "การค้าโลก", "การค้าระหว่างประเทศ", "ห่วงโซ่อุปทาน", "tariff", "export", "import", "baht", "supply chain"],
   risk_off: ["risk-off", "risk off", "ทองคำ", "พันธบัตร", "สินทรัพย์ปลอดภัย", "สินทรัพย์เสี่ยง", "เทขาย", "gold", "treasury", "bond", "safe haven"],
   consumption: ["ค้าปลีก", "บริโภค", "กำลังซื้อ", "ท่องเที่ยว", "นักท่องเที่ยว", "โรงแรม", "วีซ่า", "retail", "consumption", "tourism", "tourist"],
