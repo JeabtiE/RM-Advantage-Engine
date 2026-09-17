@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "test": "node --test \"tests/*.test.js\" && node src/test-filter.js",
     "regen:cache": "node scripts/regenerateDemoCache.mjs",
     "check:tickers": "node scripts/check-tracked-tickers.mjs"
   },

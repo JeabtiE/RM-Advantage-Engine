@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
@@ -55,6 +55,7 @@ function mountApiHandler(server, route, modulePath, errorShape) {
     const url = new URL(req.url ?? '/', 'http://localhost')
     const shimReq = {
       method: req.method,
+      headers: req.headers, // claude-agent reads content-length for its size cap
       query: Object.fromEntries(url.searchParams),
       body: req.method === 'POST' ? await readJsonBody(req) : undefined,
     }
@@ -80,10 +81,21 @@ function mountApiHandler(server, route, modulePath, errorShape) {
   })
 }
 
-function devApiPlugin() {
+// Server-only variables the /api handlers read from process.env. Vite does NOT
+// put .env values into process.env (only VITE_* into import.meta.env), so
+// without this the dev endpoints would ignore .env entirely. Copied only when the
+// shell hasn't already set them, and only these names — never into client code.
+const SERVER_ENV_KEYS = ['ANTHROPIC_API_KEY', 'LIVE_AGENT_ENABLED']
+
+function devApiPlugin(env) {
   return {
     name: 'dev-api',
     configureServer(server) {
+      for (const key of SERVER_ENV_KEYS) {
+        if (process.env[key] === undefined && env[key] !== undefined) {
+          process.env[key] = env[key]
+        }
+      }
       mountApiHandler(
         server,
         '/api/fetch-live-news',
@@ -100,6 +112,21 @@ function devApiPlugin() {
   }
 }
 
-export default defineConfig({
-  plugins: [react(), tailwindcss(), devApiPlugin()],
+export default defineConfig(({ mode }) => {
+  // '' prefix = load every variable, not just VITE_*; used server-side only.
+  const env = loadEnv(mode, process.cwd(), '')
+
+  // Any VITE_* variable is exposed to browser code. The key must never be one —
+  // refuse to start rather than risk shipping it (the old browser-direct setup
+  // used exactly this name, so stale .env files still carry it).
+  if (env.VITE_ANTHROPIC_API_KEY) {
+    throw new Error(
+      'VITE_ANTHROPIC_API_KEY is set. Remove it from .env / the environment: ' +
+        'the key is server-only and must be named ANTHROPIC_API_KEY.',
+    )
+  }
+
+  return {
+    plugins: [react(), tailwindcss(), devApiPlugin(env)],
+  }
 })

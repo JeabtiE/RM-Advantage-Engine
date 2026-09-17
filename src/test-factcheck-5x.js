@@ -3,7 +3,8 @@
 // 5 times and reports is_valid each run. On any is_valid: false, dumps the
 // exact flagged_issues + the dislocation_description so we can see what leaked.
 //
-//   $env:ANTHROPIC_API_KEY = "sk-ant-..."; node src/test-factcheck-5x.js
+// Needs `npm run dev` running with ANTHROPIC_API_KEY + LIVE_AGENT_ENABLED=true in .env:
+//   $env:AGENT_ENDPOINT_BASE = "http://localhost:5173"; node src/test-factcheck-5x.js
 
 import { analyzeImpact, factCheck } from "./utils/claudeAPI.js";
 import { buildHoldingsSummary } from "./utils/matching.js";

@@ -35,11 +35,25 @@ function resolveEndpoint() {
   return base ? new URL(AGENT_PATH, base).toString() : AGENT_PATH;
 }
 
+// Error code the endpoint returns (503) when LIVE_AGENT_ENABLED is not "true" —
+// the public deployment runs this way on purpose. Exported so the UI can show a
+// neutral "disabled" notice instead of a failure card.
+export const LIVE_MODE_DISABLED = "live_mode_disabled";
+
+// Shown wherever the error message surfaces (NewsFeed card, per-client script
+// errors), so even a view that doesn't special-case the code reads sensibly.
+const LIVE_MODE_DISABLED_MESSAGE =
+  "การวิเคราะห์สด (live analysis) ปิดอยู่บนเดโมสาธารณะ — " +
+  "ข่าวที่มีผลวิเคราะห์สำรองไว้ (cached demo) ยังใช้งานได้ตามปกติ";
+
 // postAgent — single POST to /api/claude-agent for one agent. The endpoint owns
 // the Anthropic retry/backoff (max 2, 429 → 10s); we do NOT re-retry an HTTP
-// error here or the two backoffs would stack. We DO retry a network-level
-// failure (fetch rejected before the server processed anything), since that is
-// our request never landing, not the server giving up. Returns the parsed JSON.
+// error here or the two backoffs would stack — every non-2xx (4xx, 503 kill
+// switch, 5xx) throws a plain Error and exits the loop. We DO retry a
+// network-level failure (fetch rejected before the server processed anything),
+// since that is our request never landing, not the server giving up. Returns the
+// parsed JSON. Thrown HTTP errors carry `status` and `code` (the endpoint's
+// { error } string) so callers can branch without parsing the message.
 async function postAgent(agent, payload) {
   const url = resolveEndpoint();
   const body = JSON.stringify({ agent, ...payload });
@@ -54,17 +68,22 @@ async function postAgent(agent, payload) {
       });
 
       if (!res.ok) {
-        // The endpoint answers errors as { error }. Surface that message so the
-        // caller (useDraft) can flag a rate limit / parse failure meaningfully.
-        let detail;
+        // The endpoint answers errors as { error }. Read the body ONCE as text
+        // and parse it ourselves: calling res.text() after a failed res.json()
+        // throws a TypeError (body already used), which the catch below would
+        // mistake for a network failure and retry. A non-JSON body (e.g. a
+        // platform 504 page) is reported by status only.
+        let code = null;
         try {
-          detail = (await res.json())?.error;
+          code = JSON.parse(await res.text())?.error ?? null;
         } catch {
-          detail = await res.text();
+          code = null;
         }
-        throw new Error(
-          `Agent "${agent}" request failed (${res.status}): ${detail}`,
-        );
+        const message =
+          code === LIVE_MODE_DISABLED
+            ? LIVE_MODE_DISABLED_MESSAGE
+            : `Agent "${agent}" request failed (${res.status})${code ? `: ${code}` : ""}`;
+        throw Object.assign(new Error(message), { status: res.status, code });
       }
 
       return await res.json();

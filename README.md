@@ -64,7 +64,9 @@ The "money shot" is a real case a CFA-charterholder judge described during a wor
 
 ```
 api/
+  claude-agent.js         Vercel serverless function — the only place Claude is called (all 3 agents); holds the key, validates input, kill switch
   fetch-live-news.js      Vercel serverless function — Yahoo Finance RSS proxy (CORS + .BK suffix handling)
+tests/                    Endpoint validation + client transport tests (node:test, no live API calls)
 src/
   components/
     NewsFeed.jsx          News selection (preset vs. live) + triggers the analysis pipeline
@@ -87,17 +89,36 @@ src/
 ## Getting Started
 
 ```bash
-git clone https://github.com/JeabtiE/cfa-hackathon-demo.git
-cd cfa-hackathon-demo
+git clone https://github.com/JeabtiE/RM-Advantage-Engine.git
+cd RM-Advantage-Engine
 npm install
-cp .env.example .env   # add your Claude API key
+cp .env.example .env   # add ANTHROPIC_API_KEY (server-only — never VITE_-prefixed)
 npm run dev
 ```
 
+The cached demo scenarios (tariff/gold and AI-exports news) work with no key and no API calls.
+
+**Live analysis** (any other news item, or the live Yahoo feed) needs two variables in `.env`:
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-...
+LIVE_AGENT_ENABLED=true
+```
+
+`LIVE_AGENT_ENABLED` is a kill switch: unless it is exactly `true`, `/api/claude-agent` returns `503 live_mode_disabled` and the UI shows a notice pointing to the cached scenarios. Set it locally to use live mode; the public deployment leaves it unset.
+
 Other scripts:
+- `npm test` — endpoint validation + transport tests, plus the relevance-filter checks (no API key or network needed)
 - `npm run build` — production build
-- `npm run regen:cache` — regenerate the frozen demo pipeline output in `cachedDemoRun.js`
+- `npm run regen:cache` — regenerate the frozen demo pipeline output in `cachedDemoRun.js` (needs `npm run dev` running with live mode enabled)
 - `npm run check:tickers` — verify tracked tickers still resolve correctly on data providers
+
+## Security Model
+
+- **The API key is server-only.** It lives in `ANTHROPIC_API_KEY` and is read only by `api/claude-agent.js`. The browser never calls Anthropic directly, and the dev server refuses to start if a `VITE_ANTHROPIC_API_KEY` is set, because Vite exposes every `VITE_*` variable to browser code.
+- **The endpoint validates input before spending anything.** It accepts POST only and three agent names (`impact`, `factcheck`, `script`). It checks each agent's required fields and types, and caps the size of the headline, the article content, every string passed into a prompt, and the whole request body. Errors return `{ error: "<code>" }` only, with no stack traces, upstream error bodies, or prompt text.
+- **Kill switch.** If `LIVE_AGENT_ENABLED` isn't set to `true`, the endpoint returns `503` before touching the Anthropic API.
+- **The public demo runs on cached output.** With the kill switch off, the deployed site serves the cached pipeline output and makes no paid calls.
 
 ## Known Limitations
 

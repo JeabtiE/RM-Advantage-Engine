@@ -234,7 +234,11 @@ locally, but is UNTESTED on a real deploy — verify before finals.
 
 ```
 api/
+  claude-agent.js         — the ONLY Anthropic caller (all 3 agents). Server-only ANTHROPIC_API_KEY,
+                            input allowlist/type/size validation, LIVE_AGENT_ENABLED kill switch
+                            (anything but "true" → 503 live_mode_disabled). Errors are { error: code } only.
   fetch-live-news.js      — Vercel serverless Yahoo Finance RSS proxy (CORS + .BK suffix)
+tests/                    — node:test suites (`npm test`); fetch is stubbed, never hits Anthropic
 src/
   components/
     NewsFeed.jsx          — news selection (preset | live source switcher) + trigger analysis

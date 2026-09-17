@@ -19,11 +19,40 @@
 //   - max 2 retries, 429 → wait 10s before retry, 5xx/network → short backoff
 //   - maxTokens: 2048 for impact/factcheck, 1024 for script (measured — see
 //     claudeAPI.js for the token-utilization rationale).
+//
+// PUBLIC ENDPOINT HARDENING: this URL is reachable by anyone and spends a paid
+// key, so every request passes these gates, in order, before any Anthropic call:
+//   405 non-POST → 503 kill switch → 413 body size → 400 JSON / agent / fields
+//   → 413 per-field length. Error bodies are always { error: "<code>" } — no
+//   stack traces, upstream bodies, or prompt text ever leave this function.
 
 const API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-sonnet-4-6";
 const MAX_RETRIES = 2;
 const RATE_LIMIT_BACKOFF_MS = 10_000; // 429 handling: wait 10s before retry
+
+// --- Input caps --------------------------------------------------------------
+// WHY: every string below is interpolated into a prompt we pay for per token, so
+// an uncapped field is an open invitation to burn credit (or to smuggle a long
+// prompt-injection essay). Caps are sized from real traffic with wide headroom:
+// mockNews headlines ≤ 68 chars / content ≤ 351; live Yahoo items are title +
+// an RSS lede of ≤ ~700 chars; holdingsSummary is ~900 chars for the 10-client
+// book; the largest real request body (factcheck on N006) is ~5 KB.
+const MAX_HEADLINE_CHARS = 500;
+const MAX_CONTENT_CHARS = 4_000;
+// Any other string forwarded into a prompt (marketOutcome, holdingsSummary,
+// Agent 1 fields, client name, tickers, …) — and every nested string, since
+// agent1Output is JSON-stringified into the Agent 2 prompt wholesale.
+const MAX_PROMPT_FIELD_CHARS = 4_000;
+// Whole request body. ~10x the largest real payload.
+const MAX_BODY_BYTES = 64_000;
+// Arrays (affected_tickers, holdings, matchedHoldings) and nesting depth — keeps
+// a small-in-bytes but pathological payload from fanning out.
+const MAX_ARRAY_ITEMS = 100;
+const MAX_DEPTH = 6;
+
+const ALLOWED_AGENTS = new Set(["impact", "factcheck", "script"]);
+const RISK_PROFILES = new Set(["conservative", "moderate", "aggressive"]);
 
 export const config = { maxDuration: 30 };
 
@@ -422,65 +451,248 @@ Write this client's phone script. Match the tone to their risk profile. Return t
 }
 
 // ---------------------------------------------------------------------------
-// HTTP handler — dispatch on the "agent" field, validate the payload each agent
-// needs, run it, and return the parsed JSON. On any failure return a JSON error
-// with a non-2xx status so the caller (claudeAPI.js, next step) can surface it.
+// Request validation
+// ---------------------------------------------------------------------------
+
+// Thrown by validators; the handler turns it into { error } with this status.
+// Messages are fixed strings naming the FIELD, never echoing the caller's value.
+class RequestError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
+
+const isPlainObject = (v) =>
+  v !== null && typeof v === "object" && !Array.isArray(v);
+
+function requireObject(value, field) {
+  if (!isPlainObject(value)) {
+    throw new RequestError(400, `invalid_request: ${field} must be an object`);
+  }
+}
+
+function requireString(value, field, { maxChars, allowEmpty = false }) {
+  if (typeof value !== "string" || (!allowEmpty && value.trim() === "")) {
+    throw new RequestError(
+      400,
+      `invalid_request: ${field} must be a ${allowEmpty ? "" : "non-empty "}string`,
+    );
+  }
+  if (value.length > maxChars) {
+    throw new RequestError(413, `payload_too_large: ${field} exceeds ${maxChars} chars`);
+  }
+}
+
+function optionalString(value, field, opts) {
+  if (value !== undefined) requireString(value, field, { ...opts, allowEmpty: true });
+}
+
+function requireStringArray(value, field) {
+  if (!Array.isArray(value) || value.some((v) => typeof v !== "string")) {
+    throw new RequestError(400, `invalid_request: ${field} must be an array of strings`);
+  }
+}
+
+// Generic backstop over the WHOLE payload: every nested string is capped, arrays
+// are bounded, and depth is limited. The per-agent checks below cover the fields
+// the prompts name; this covers everything else (agent1Output is stringified
+// into the Agent 2 prompt in full, so its unknown keys reach the model too).
+function enforceGenericLimits(value, path = "body", depth = 0) {
+  if (depth > MAX_DEPTH) {
+    throw new RequestError(400, `invalid_request: ${path} is nested too deeply`);
+  }
+  if (typeof value === "string") {
+    if (value.length > MAX_PROMPT_FIELD_CHARS) {
+      throw new RequestError(
+        413,
+        `payload_too_large: ${path} exceeds ${MAX_PROMPT_FIELD_CHARS} chars`,
+      );
+    }
+  } else if (Array.isArray(value)) {
+    if (value.length > MAX_ARRAY_ITEMS) {
+      throw new RequestError(
+        413,
+        `payload_too_large: ${path} exceeds ${MAX_ARRAY_ITEMS} items`,
+      );
+    }
+    value.forEach((v, i) => enforceGenericLimits(v, `${path}[${i}]`, depth + 1));
+  } else if (value !== null && typeof value === "object") {
+    for (const v of Object.values(value)) {
+      // Keys are not echoed — they are caller-controlled.
+      enforceGenericLimits(v, `${path}.<field>`, depth + 1);
+    }
+  }
+}
+
+function validateNews(news) {
+  requireObject(news, "news");
+  requireString(news.headline, "news.headline", { maxChars: MAX_HEADLINE_CHARS });
+  requireString(news.content, "news.content", { maxChars: MAX_CONTENT_CHARS });
+  // Live items always carry a sentinel string, presets a real outcome — but the
+  // prompt interpolates it unconditionally, so it must be a string.
+  requireString(news.marketOutcome, "news.marketOutcome", {
+    maxChars: MAX_PROMPT_FIELD_CHARS,
+  });
+}
+
+// Shape Agent 1 returns (see AGENT1_SYSTEM_PROMPT → Output). Used for both the
+// factcheck input and the script input, which is that same analysis.
+function validateAnalysis(a, field) {
+  requireObject(a, field);
+  requireString(a.sentiment, `${field}.sentiment`, {
+    maxChars: MAX_PROMPT_FIELD_CHARS,
+  });
+  optionalString(a.dislocation_description, `${field}.dislocation_description`, {
+    maxChars: MAX_PROMPT_FIELD_CHARS,
+  });
+  optionalString(a.reasoning, `${field}.reasoning`, {
+    maxChars: MAX_PROMPT_FIELD_CHARS,
+  });
+}
+
+function validateAgent1Output(a) {
+  validateAnalysis(a, "agent1Output");
+  requireStringArray(a.affected_tickers, "agent1Output.affected_tickers");
+  requireStringArray(a.affected_sectors, "agent1Output.affected_sectors");
+  if (typeof a.dislocation_detected !== "boolean") {
+    throw new RequestError(
+      400,
+      "invalid_request: agent1Output.dislocation_detected must be a boolean",
+    );
+  }
+}
+
+function validateClient(c) {
+  requireObject(c, "client");
+  requireString(c.name, "client.name", { maxChars: MAX_PROMPT_FIELD_CHARS });
+  if (!RISK_PROFILES.has(c.riskProfile)) {
+    throw new RequestError(
+      400,
+      'invalid_request: client.riskProfile must be "conservative" | "moderate" | "aggressive"',
+    );
+  }
+  // generateScript tolerates a missing list (?? []), so it stays optional.
+  if (c.matchedHoldings !== undefined) {
+    if (!Array.isArray(c.matchedHoldings)) {
+      throw new RequestError(400, "invalid_request: client.matchedHoldings must be an array");
+    }
+    c.matchedHoldings.forEach((h, i) => {
+      const f = `client.matchedHoldings[${i}]`;
+      requireObject(h, f);
+      requireString(h.ticker, `${f}.ticker`, { maxChars: MAX_PROMPT_FIELD_CHARS });
+      requireString(h.name, `${f}.name`, { maxChars: MAX_PROMPT_FIELD_CHARS });
+    });
+  }
+}
+
+// parseAndValidate — everything that can reject a request without touching the
+// Anthropic API. Returns the parsed payload or throws RequestError.
+function parseAndValidate(req) {
+  // Size first, on the cheapest signal available. Vercel has already parsed a
+  // JSON body into an object, so re-measure it; also honour content-length when
+  // the platform passes it, so an oversized body is refused before we walk it.
+  const declared = Number(req.headers?.["content-length"]);
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
+    throw new RequestError(413, "payload_too_large: request body");
+  }
+  const raw = typeof req.body === "string" ? req.body : JSON.stringify(req.body ?? {});
+  if (Buffer.byteLength(raw ?? "", "utf8") > MAX_BODY_BYTES) {
+    throw new RequestError(413, "payload_too_large: request body");
+  }
+
+  let payload = req.body;
+  if (typeof payload === "string") {
+    try {
+      payload = JSON.parse(payload || "{}");
+    } catch {
+      throw new RequestError(400, "invalid_json");
+    }
+  }
+  if (!isPlainObject(payload)) {
+    throw new RequestError(400, "invalid_request: body must be a JSON object");
+  }
+
+  if (!ALLOWED_AGENTS.has(payload.agent)) {
+    throw new RequestError(
+      400,
+      'unknown_agent: expected "impact" | "factcheck" | "script"',
+    );
+  }
+
+  switch (payload.agent) {
+    case "impact":
+      validateNews(payload.news);
+      requireString(payload.holdingsSummary, "holdingsSummary", {
+        maxChars: MAX_PROMPT_FIELD_CHARS,
+      });
+      break;
+    case "factcheck":
+      validateNews(payload.news);
+      validateAgent1Output(payload.agent1Output);
+      break;
+    case "script":
+      validateAnalysis(payload.analysis, "analysis");
+      validateClient(payload.client);
+      break;
+  }
+
+  enforceGenericLimits(payload);
+  return payload;
+}
+
+// Map an internal failure to a stable, non-revealing error code. The full
+// message (which can contain the upstream body or the model's raw text) is
+// logged server-side only.
+function publicErrorFor(err) {
+  const msg = String(err?.message ?? "");
+  if (msg.startsWith("Missing Anthropic API key")) return [500, "server_misconfigured"];
+  if (msg.includes("(429)")) return [429, "upstream_rate_limited"];
+  if (msg.startsWith("Failed to parse Claude JSON")) return [502, "invalid_model_output"];
+  return [502, "upstream_error"];
+}
+
+// ---------------------------------------------------------------------------
+// HTTP handler — gate, validate, dispatch on "agent", return the parsed JSON.
 // ---------------------------------------------------------------------------
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed. Use POST." });
+    res.setHeader?.("Allow", "POST");
+    return res.status(405).json({ error: "method_not_allowed" });
   }
 
-  // Vercel parses a JSON body into req.body; guard the node-test path too.
-  const payload =
-    typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body ?? {};
-  const { agent } = payload;
+  // Kill switch — checked before parsing anything, so a disabled deployment
+  // costs nothing and reveals nothing about the payload contract. Opt-IN: an
+  // unset variable means disabled, so a fresh deploy is safe by default.
+  if (process.env.LIVE_AGENT_ENABLED !== "true") {
+    return res.status(503).json({ error: "live_mode_disabled" });
+  }
 
+  let payload;
+  try {
+    payload = parseAndValidate(req);
+  } catch (err) {
+    if (err instanceof RequestError) {
+      return res.status(err.status).json({ error: err.message });
+    }
+    return res.status(400).json({ error: "invalid_request" });
+  }
+
+  const { agent } = payload;
   try {
     let result;
-    switch (agent) {
-      case "impact": {
-        const { news, holdingsSummary } = payload;
-        if (!news || typeof holdingsSummary !== "string") {
-          return res.status(400).json({
-            error: 'agent "impact" requires { news, holdingsSummary }',
-          });
-        }
-        result = await analyzeImpact(news, holdingsSummary);
-        break;
-      }
-      case "factcheck": {
-        const { news, agent1Output } = payload;
-        if (!news || !agent1Output) {
-          return res.status(400).json({
-            error: 'agent "factcheck" requires { news, agent1Output }',
-          });
-        }
-        result = await factCheck(news, agent1Output);
-        break;
-      }
-      case "script": {
-        const { analysis, client } = payload;
-        if (!analysis || !client) {
-          return res.status(400).json({
-            error: 'agent "script" requires { analysis, client }',
-          });
-        }
-        result = await generateScript(analysis, client);
-        break;
-      }
-      default:
-        return res.status(400).json({
-          error: `Unknown agent "${agent}". Expected "impact" | "factcheck" | "script".`,
-        });
+    if (agent === "impact") {
+      result = await analyzeImpact(payload.news, payload.holdingsSummary);
+    } else if (agent === "factcheck") {
+      result = await factCheck(payload.news, payload.agent1Output);
+    } else {
+      result = await generateScript(payload.analysis, payload.client);
     }
-
     return res.status(200).json(result);
   } catch (err) {
-    // The pipeline stalls if a caller can't tell a parse failure from a rate
-    // limit — pass the message through rather than a generic 500 body.
-    return res.status(502).json({
-      error: err?.message ?? `agent "${agent}" failed`,
-    });
+    const [status, code] = publicErrorFor(err);
+    // Truncated: parse failures embed the model's full output in the message.
+    console.error(`[claude-agent] ${agent} failed (${code}):`, String(err?.message).slice(0, 300));
+    return res.status(status).json({ error: code });
   }
 }

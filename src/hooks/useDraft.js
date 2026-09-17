@@ -112,6 +112,9 @@ export function useDraft() {
   const [draft, setDraft] = useState(null);
   const [scripts, setScripts] = useState(null); // Agent 3 output, post-approval
   const [error, setError] = useState(null);
+  // Machine-readable code from the endpoint (e.g. "live_mode_disabled") so the
+  // UI can tell a deliberately disabled live mode apart from a real failure.
+  const [errorCode, setErrorCode] = useState(null);
   // Pre-filter verdict for the last analyzeNews() call. Held separately from
   // `error` because being irrelevant is a normal outcome, not a failure.
   const [relevance, setRelevance] = useState(null);
@@ -123,6 +126,7 @@ export function useDraft() {
   const analyzeNews = useCallback(async (news) => {
     setStatus(DraftStatus.ANALYZING);
     setError(null);
+    setErrorCode(null);
     setScripts(null);
     setDraft(null);
     setRelevance(null);
@@ -215,6 +219,7 @@ export function useDraft() {
       // Any pipeline failure (Agent 1/2 API error, bad JSON) lands here so the
       // UI can show it instead of crashing mid-demo.
       setError(err?.message ?? String(err));
+      setErrorCode(err?.code ?? null);
       setStatus(DraftStatus.ERROR);
     }
   }, []);
@@ -334,6 +339,7 @@ export function useDraft() {
     setDraft(null);
     setScripts(null);
     setError(null);
+    setErrorCode(null);
     setRelevance(null);
   }, []);
 
@@ -342,6 +348,7 @@ export function useDraft() {
     draft,
     scripts,
     error,
+    errorCode,
     relevance,
     analyzeNews,
     approve,
