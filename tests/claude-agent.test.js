@@ -272,6 +272,97 @@ test("script payload whose matchedHoldings carry matchedBy/direction passes vali
   assert.equal(fetchCalls.length, 1);
 });
 
+test("script payload: invalid direction / matchedBy -> 400", async () => {
+  const base = n006Run.affectedClients[0];
+  const withHolding = (patch) => ({
+    ...base,
+    matchedHoldings: [{ ...base.matchedHoldings[0], ...patch }],
+  });
+  for (const patch of [
+    { direction: "bullish" },
+    { direction: "POSITIVE" },
+    { direction: 1 },
+    { direction: null },
+    { matchedBy: "name" },
+    { matchedBy: "" },
+  ]) {
+    const out = await call({
+      body: { agent: "script", analysis: n006Run.analysis, client: withHolding(patch) },
+    });
+    assertRejected(out, 400);
+  }
+});
+
+test("script prompt includes each holding's direction only when present", async () => {
+  const client = {
+    name: "คุณทดสอบ",
+    riskProfile: "moderate",
+    matchedHoldings: [
+      { ticker: "KBANK", name: "ธนาคารกสิกรไทย", direction: "positive", matchedBy: "sector" },
+      { ticker: "LH", name: "แลนด์ แอนด์ เฮ้าส์" },
+    ],
+  };
+  fetchResponder = () => anthropicOk({ script: "เรียนคุณทดสอบ" });
+  const out = await call({ body: { agent: "script", analysis: n006Run.analysis, client } });
+  assert.equal(out.status, 200);
+  const prompt = JSON.parse(fetchCalls[0].init.body).messages[0].content;
+  assert.match(prompt, /KBANK \(ธนาคารกสิกรไทย\) — direction: positive/);
+  assert.match(prompt, /LH \(แลนด์ แอนด์ เฮ้าส์\)(?! — direction)/);
+});
+
+test("factcheck payload with normalized Phase 3 fields passes; malformed ones -> 400", async () => {
+  const agent1Output = {
+    ...n006Run.analysis,
+    event_scope: "systemic",
+    sector_impacts: [{ sector: "banking", direction: "negative" }],
+    normalization_notes: ["note"],
+  };
+  const ok = await call({ body: { agent: "factcheck", news: n006, agent1Output } });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  // Server bookkeeping is not shown to the fact checker.
+  assert.ok(!JSON.parse(fetchCalls[0].init.body).messages[0].content.includes("normalization_notes"));
+
+  fetchCalls = [];
+  for (const patch of [
+    { event_scope: "global" },
+    { sector_impacts: "banking" },
+    { sector_impacts: [{ sector: "banking" }] },
+    { sector_impacts: [{ sector: "banking", direction: "up" }] },
+    { sector_impacts: [{ direction: "positive" }] },
+    { normalization_notes: [1] },
+  ]) {
+    assertRejected(await call({ body: { agent: "factcheck", news: n006, agent1Output: { ...agent1Output, ...patch } } }), 400);
+  }
+});
+
+test("impact response is normalized and model-authored notes are discarded", async () => {
+  fetchResponder = () =>
+    anthropicOk({
+      affected_tickers: [],
+      affected_sectors: ["Banking"],
+      sentiment: "negative",
+      event_scope: "systemic",
+      sector_impacts: [
+        { sector: "banking", direction: "positive" },
+        { sector: "property", direction: "negative" },
+        { sector: "crypto", direction: "positive" },
+      ],
+      dislocation_detected: false,
+      dislocation_description: "",
+      reasoning: "r",
+      normalization_notes: ["INJECTED by the model"],
+    });
+  const out = await call({ body: impactBody() });
+  assert.equal(out.status, 200);
+  assert.deepEqual(out.body.affected_sectors, ["banking", "property"]);
+  assert.deepEqual(out.body.sector_impacts, [
+    { sector: "banking", direction: "positive" },
+    { sector: "property", direction: "negative" },
+  ]);
+  assert.ok(!out.body.normalization_notes.some((n) => n.includes("INJECTED")));
+  assert.ok(out.body.normalization_notes.some((n) => n.includes("crypto")));
+});
+
 test("a long live-mode item (title + ~700-char lede) passes validation", async () => {
   const title = "Central Pattana and Mitsubishi Estate announce $330m mixed-use project".repeat(2);
   const news = adaptLiveItem({

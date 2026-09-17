@@ -43,6 +43,24 @@ const SENTIMENT_META = {
   neutral: { label: "เป็นกลาง", cls: "text-slate-500" },
 };
 
+// event_scope → Thai label + a one-line hint on hover (how widely clients match).
+const SCOPE_META = {
+  systemic: { label: "ทั้งตลาด (systemic)", hint: "ข่าวมหภาค — ขยายผลไปยัง sector อื่นได้" },
+  sector: { label: "รายอุตสาหกรรม (sector)", hint: "ข่าวของอุตสาหกรรมเดียว" },
+  single_company: {
+    label: "รายบริษัท (single company)",
+    hint: "จับคู่เฉพาะลูกค้าที่ถือหุ้นตัวนี้ — ไม่ขยายไปทั้ง sector",
+  },
+};
+
+// Per-sector / per-holding direction. Green up / red down per the design
+// language's financial colors; neutral stays slate.
+const DIRECTION_META = {
+  positive: { arrow: "▲", label: "เชิงบวก", pill: "bg-emerald-50 text-emerald-700", text: "text-emerald-600" },
+  negative: { arrow: "▼", label: "เชิงลบ", pill: "bg-rose-50 text-rose-700", text: "text-rose-600" },
+  neutral: { arrow: "•", label: "เป็นกลาง", pill: "bg-slate-100 text-slate-600", text: "text-slate-400" },
+};
+
 export default function ApprovalDashboard({ draft, onApprove, onReject }) {
   // Collapse long source news by default so the priority list and the
   // approve/reject buttons stay reachable without heavy scrolling mid-demo.
@@ -69,6 +87,18 @@ export default function ApprovalDashboard({ draft, onApprove, onReject }) {
   const issues = draft.agent2Result?.flagged_issues ?? [];
   const adjusted = draft.agent2Result?.adjusted_reasoning;
   const clients = draft.affectedClients ?? [];
+  // Phase 3 Agent 1 fields — read from the raw analysis the draft keeps. Cached
+  // runs predate them, so each piece renders only when present.
+  const analysis = draft.analysis ?? {};
+  const scope = SCOPE_META[analysis.event_scope];
+  const sectorDirections = new Map(
+    (Array.isArray(analysis.sector_impacts) ? analysis.sector_impacts : []).map(
+      (s) => [s.sector, s.direction],
+    ),
+  );
+  const notes = Array.isArray(analysis.normalization_notes)
+    ? analysis.normalization_notes
+    : [];
   const isPending = draft.status === DraftStatus.PENDING;
   const isApproved = draft.status === DraftStatus.APPROVED;
   const isRejected = draft.status === DraftStatus.REJECTED;
@@ -135,24 +165,41 @@ export default function ApprovalDashboard({ draft, onApprove, onReject }) {
           <p className="text-xs font-semibold text-slate-500">
             การวิเคราะห์ (Agent 1)
           </p>
-          <div className="mt-2 flex items-center gap-2">
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             <span className="text-xs text-slate-500">Sentiment:</span>
             <span className={`text-sm font-bold ${sentiment.cls}`}>
               {sentiment.label}
             </span>
+            {scope && (
+              <span
+                className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600"
+                title={scope.hint}
+              >
+                ขอบเขต: {scope.label}
+              </span>
+            )}
           </div>
           <p className="mt-3 text-sm leading-relaxed text-slate-700">
             {draft.reasoning}
           </p>
           <div className="mt-3 flex flex-wrap gap-1.5">
-            {(draft.affectedSectors ?? []).map((s) => (
-              <span
-                key={s}
-                className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-600"
-              >
-                {s}
-              </span>
-            ))}
+            {(draft.affectedSectors ?? []).map((s) => {
+              // Per-sector direction when Agent 1 supplied one; cached runs
+              // (and sectors without an entry) keep the plain neutral pill.
+              const dir = DIRECTION_META[sectorDirections.get(s)];
+              return (
+                <span
+                  key={s}
+                  className={`rounded-full px-2.5 py-0.5 text-xs ${
+                    dir ? dir.pill : "bg-slate-100 text-slate-600"
+                  }`}
+                  title={dir?.label}
+                >
+                  {dir ? `${dir.arrow} ` : ""}
+                  {s}
+                </span>
+              );
+            })}
             {(draft.affectedTickers ?? []).map((t) => (
               <span
                 key={t}
@@ -162,6 +209,20 @@ export default function ApprovalDashboard({ draft, onApprove, onReject }) {
               </span>
             ))}
           </div>
+          {/* Server-side consistency fixes to Agent 1's output. Shown so the
+              CIO approves what the matcher actually used, not a silent edit. */}
+          {notes.length > 0 && (
+            <div className="mt-3 rounded-lg bg-slate-50 p-3">
+              <p className="text-[11px] font-semibold text-slate-600">
+                ระบบปรับผลวิเคราะห์อัตโนมัติ (normalization)
+              </p>
+              <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-slate-500">
+                {notes.map((note, i) => (
+                  <li key={i}>{note}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -258,9 +319,20 @@ export default function ApprovalDashboard({ draft, onApprove, onReject }) {
                         </span>
                         {keyAccount && <KeyAccountBadge />}
                         <span className="text-xs text-slate-400">
-                          {(client.matchedHoldings ?? [])
-                            .map((h) => h.ticker)
-                            .join(", ")}
+                          {(client.matchedHoldings ?? []).map((h, j) => {
+                            const dir = DIRECTION_META[h.direction];
+                            return (
+                              <span key={h.ticker}>
+                                {j > 0 && ", "}
+                                {h.ticker}
+                                {dir && (
+                                  <span className={dir.text} title={dir.label}>
+                                    {dir.arrow}
+                                  </span>
+                                )}
+                              </span>
+                            );
+                          })}
                         </span>
                       </div>
                     </div>
