@@ -65,6 +65,30 @@ inherent to how the tier is defined in practice, and the boost is a ranking
 nudge, not a gate: a near-miss client with real exposure still surfaces on the
 list. The ranked list is a starting point the CIO/RM overrides by hand (below).
 
+### Which holdings count — scope gate and direction
+
+`impactShare` sums the weights of the client's **matched** holdings from
+`findAffectedClients()`:
+
+- `event_scope: "single_company"` → only holdings whose **ticker** is in
+  `affected_tickers` match; the rest of that sector does not. Any other (or
+  missing) scope → ticker **or** sector match, as originally.
+- Each matched holding carries `matchedBy` (`ticker` wins if both) and
+  `direction` — the sector's `sector_impacts` direction, else the top-level
+  `sentiment`, else `neutral`.
+
+**The score is GROSS exposure — directions are never netted.** A client long
+banks (▲) and property (▼) on a rate hike adds both weights. Offsetting
+exposures may roughly cancel in P&L, but the mix inside the portfolio shifted,
+and that is exactly what the RM should explain — so the client still ranks by
+total exposure. Direction is shown to the CIO (▲/▼ per ticker) and passed to
+Agent 3; it does not change the ranking.
+
+**Known gap:** a sector tagged `neutral` still matches and still counts toward
+the score, so a client with only neutral holdings can rank at 100% (seen live on
+a Fed-hike fixture, 2026-09-17). Whether neutral-only matches should be dropped
+or down-ranked is an open prioritization decision.
+
 ## Secondary factors (manual — CIO/RM judgment)
 
 The ranked list is a starting point, not the final call order. During Four Eyes

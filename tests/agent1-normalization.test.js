@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import {
   normalizeAgent1Output,
   heldSectorsFromSummary,
+  normalizeAgent2Output,
 } from "../api/claude-agent.js";
 import { buildHoldingsSummary, findAffectedClients } from "../src/utils/matching.js";
 import { getAllSectors } from "../src/data/mockClients.js";
@@ -329,4 +330,65 @@ test("integration (c): sector omitted from affected_sectors but in sector_impact
   const out = run(raw);
   assert.deepEqual(holdingsOf(out).TELECOM_ONLY, ["TRUE:sector:negative"]);
   assert.deepEqual(holdingsOf(out).MIXED, ["KBANK:sector:positive", "ADVANC:sector:negative"]);
+});
+
+// --- Agent 2 consistency guard ------------------------------------------------------
+
+test("agent2 guard: empty issues + is_valid false -> true, with a note", () => {
+  const out = normalizeAgent2Output({ is_valid: false, flagged_issues: [], adjusted_reasoning: "r" });
+  assert.equal(out.is_valid, true);
+  assert.equal(out.factcheck_normalization_notes.length, 1);
+  assert.equal(out.adjusted_reasoning, "r");
+});
+
+test("agent2 guard: missing issues -> is_valid true, issues []", () => {
+  const out = normalizeAgent2Output({ is_valid: false, adjusted_reasoning: "r" });
+  assert.equal(out.is_valid, true);
+  assert.deepEqual(out.flagged_issues, []);
+  assert.equal(out.factcheck_normalization_notes.length, 1);
+});
+
+test("agent2 guard: non-empty issues + is_valid true -> false, with a note", () => {
+  const out = normalizeAgent2Output({ is_valid: true, flagged_issues: ["x"], adjusted_reasoning: "r" });
+  assert.equal(out.is_valid, false);
+  assert.equal(out.factcheck_normalization_notes.length, 1);
+  assert.match(out.factcheck_normalization_notes[0], /false/);
+});
+
+test("agent2 guard: consistent input unchanged, no notes", () => {
+  for (const input of [
+    { is_valid: true, flagged_issues: [], adjusted_reasoning: "r" },
+    { is_valid: false, flagged_issues: ["a", "b"], adjusted_reasoning: "r2" },
+  ]) {
+    assert.deepEqual(normalizeAgent2Output(input), { ...input, factcheck_normalization_notes: [] });
+  }
+});
+
+test("agent2 guard: malformed issues are cleaned and is_valid derived from what remains", () => {
+  const blanks = normalizeAgent2Output({ is_valid: false, flagged_issues: ["", "  ", 3, null] });
+  assert.deepEqual(blanks.flagged_issues, []);
+  assert.equal(blanks.is_valid, true);
+  assert.equal(blanks.factcheck_normalization_notes.length, 2);
+
+  const bare = normalizeAgent2Output({ is_valid: true, flagged_issues: "ตัวเลขไม่มีในข่าว" });
+  assert.deepEqual(bare.flagged_issues, ["ตัวเลขไม่มีในข่าว"]);
+  assert.equal(bare.is_valid, false);
+
+  const junk = normalizeAgent2Output({ is_valid: "yes", flagged_issues: { a: 1 } });
+  assert.deepEqual(junk.flagged_issues, []);
+  assert.equal(junk.is_valid, true);
+});
+
+test("agent2 guard: idempotent and does not mutate input", () => {
+  for (const input of [
+    { is_valid: true, flagged_issues: "one" },
+    { is_valid: false, flagged_issues: [] },
+    { is_valid: "no", flagged_issues: ["", "real"] },
+  ]) {
+    const snapshot = structuredClone(input);
+    const once = normalizeAgent2Output(input);
+    assert.deepEqual(input, snapshot);
+    assert.deepEqual(normalizeAgent2Output(once), once);
+  }
+  for (const v of [null, undefined, "x", []]) assert.equal(normalizeAgent2Output(v), v);
 });

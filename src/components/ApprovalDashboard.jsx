@@ -86,6 +86,9 @@ export default function ApprovalDashboard({ draft, onApprove, onReject }) {
   const factOk = draft.agent2Result?.is_valid;
   const issues = draft.agent2Result?.flagged_issues ?? [];
   const adjusted = draft.agent2Result?.adjusted_reasoning;
+  const factNotes = Array.isArray(draft.agent2Result?.factcheck_normalization_notes)
+    ? draft.agent2Result.factcheck_normalization_notes
+    : [];
   const clients = draft.affectedClients ?? [];
   // Phase 3 Agent 1 fields — read from the raw analysis the draft keeps. Cached
   // runs predate them, so each piece renders only when present.
@@ -253,6 +256,20 @@ export default function ApprovalDashboard({ draft, onApprove, onReject }) {
               <p className="mt-1 text-xs leading-relaxed text-amber-800">
                 {adjusted}
               </p>
+            </div>
+          )}
+          {/* Server guard corrections (e.g. is_valid re-derived from the issue
+              list). Absent on cached runs and on consistent responses. */}
+          {factNotes.length > 0 && (
+            <div className="mt-3 rounded-lg bg-slate-50 p-3">
+              <p className="text-[11px] font-semibold text-slate-600">
+                ระบบปรับผลตรวจสอบอัตโนมัติ (normalization)
+              </p>
+              <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-slate-500">
+                {factNotes.map((note, i) => (
+                  <li key={i}>{note}</li>
+                ))}
+              </ul>
             </div>
           )}
         </div>

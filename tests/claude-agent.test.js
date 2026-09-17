@@ -335,6 +335,27 @@ test("factcheck payload with normalized Phase 3 fields passes; malformed ones ->
   }
 });
 
+test("factcheck response passes through the Agent 2 guard; model-written notes discarded", async () => {
+  fetchResponder = () =>
+    anthropicOk({
+      is_valid: false,
+      flagged_issues: [],
+      adjusted_reasoning: "r",
+      factcheck_normalization_notes: ["INJECTED by the model"],
+    });
+  const out = await call({ body: { agent: "factcheck", news: n006, agent1Output: n006Run.analysis } });
+  assert.equal(out.status, 200);
+  assert.equal(out.body.is_valid, true);
+  assert.deepEqual(out.body.flagged_issues, []);
+  assert.equal(out.body.factcheck_normalization_notes.length, 1);
+  assert.ok(!out.body.factcheck_normalization_notes.some((n) => n.includes("INJECTED")));
+
+  fetchCalls = [];
+  fetchResponder = () => anthropicOk({ is_valid: true, flagged_issues: ["ปัญหา"], adjusted_reasoning: "r" });
+  const flagged = await call({ body: { agent: "factcheck", news: n006, agent1Output: n006Run.analysis } });
+  assert.equal(flagged.body.is_valid, false);
+});
+
 test("impact response is normalized and model-authored notes are discarded", async () => {
   fetchResponder = () =>
     anthropicOk({

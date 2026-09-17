@@ -127,6 +127,9 @@ Classify the event before choosing tickers and sectors. The scope controls how w
 - "systemic" — macro or market-wide news (interest rates, tariffs, FX, oil shocks, risk-off). Second-order expansion to other sectors IS allowed, using the sector mappings above, and every expanded sector must be justified by the causal chain in "reasoning".
   Example: "The baht falls 4% in a week" -> systemic; technology (exporters) positive, transport (fuel/import costs) negative.
 
+## Ticker discipline for "systemic" and "sector" events
+affected_tickers is NOT a list of every holding in the affected sectors. For "systemic" and "sector" events, include a ticker ONLY if (a) the company is named in the news or market outcome, or (b) your reasoning states a specific, company-level exposure (something true of that company and not of its sector peers). Sector-wide exposure belongs in affected_sectors and sector_impacts — the downstream matcher already reaches every client holding that sector. An empty affected_tickers list is correct for most macro events.
+
 ## Sector impacts — direction per sector
 For every sector you list, state which way THIS event pushes it. Mixed-direction events are normal and expected: a rate hike is positive for banking and negative for property at the same time. The top-level "sentiment" is only the net read; it must NOT override a per-sector direction — if banking is positive and property negative, say so in sector_impacts even if sentiment is "negative".
 Sector values in affected_sectors and sector_impacts must be EXACTLY the sector names that appear in the client holdings universe (the last item inside each parenthesis, e.g. "banking"), lowercase. Do not invent sectors. Every sector in sector_impacts must also appear in affected_sectors.
@@ -134,7 +137,7 @@ Sector values in affected_sectors and sector_impacts must be EXACTLY the sector 
 ## Output
 Return ONLY a JSON object, no markdown fences, no prose around it, with exactly these keys:
 {
-  "affected_tickers": [string],        // SET tickers the news plausibly touches, given the holdings provided
+  "affected_tickers": [string],        // held SET tickers with company-level exposure only (see ticker discipline above)
   "affected_sectors": [string],        // held sectors touched, per event_scope (see above)
   "sentiment": "positive" | "negative" | "neutral",   // net direction for affected holdings
   "event_scope": "systemic" | "sector" | "single_company",
@@ -263,6 +266,13 @@ Analyze this event using the three-step dislocation methodology. Return the JSON
     maxTokens: 2048,
   });
   const parsed = parseAIResponse(raw);
+  // Ticker discipline (only named / company-specific tickers on systemic and
+  // sector news) is prompt guidance ONLY — deliberately no server-side cap. A
+  // count cap cannot tell a sector sweep from a legitimately named list (a news
+  // item naming five banks), so it would silently drop a company the news is
+  // actually about and quietly remove its holders from the call list. Over-long
+  // lists are visible to the CIO; a silent drop is not.
+  //
   // normalization_notes is OURS, not the model's: a model-authored note would be
   // shown to the CIO as if the server had written it.
   if (parsed && typeof parsed === "object") delete parsed.normalization_notes;
@@ -437,12 +447,16 @@ Therefore: NEVER flag a ticker or sector merely because it is not named verbatim
 - Do not re-score or re-rank anything.
 - Do not rewrite the analysis unless you found a real narrative problem.
 - When in doubt, do not flag — a false alarm wastes the human reviewer's time.
+- Do not list observations you conclude are acceptable. If you examine something and decide it is fine (e.g. "this is acceptable second-order reasoning", "not a real problem"), leave it out entirely — flagged_issues is not a notes field.
+
+## flagged_issues and is_valid must agree
+flagged_issues contains ONLY problems serious enough that the CIO should not approve the draft as written. is_valid is false if and only if flagged_issues is non-empty: no issues -> is_valid true; one or more issues -> is_valid false.
 
 ## Output
 Return ONLY a JSON object, no markdown fences, no prose around it, with exactly these keys:
 {
-  "is_valid": boolean,            // true if no material problems were found
-  "flagged_issues": [string],     // Thai. One short line per problem; empty array if none
+  "is_valid": boolean,            // true exactly when flagged_issues is empty
+  "flagged_issues": [string],     // Thai. One short line per approval-blocking problem; empty array if none
   "adjusted_reasoning": string    // Thai. If issues were found, a corrected version of Agent 1's reasoning with the unsupported claims removed/fixed. If none, echo Agent 1's reasoning unchanged.
 }
 Write flagged_issues and adjusted_reasoning in Thai (the RM-facing language). Keep the JSON keys in English exactly as above.`;
@@ -476,7 +490,56 @@ Verify the Agent 1 analysis against the original news and market outcome above. 
     user,
     maxTokens: 2048,
   });
-  return parseAIResponse(raw);
+  const parsed = parseAIResponse(raw);
+  // Same rule as Agent 1: the notes field is the server's, never the model's.
+  if (parsed && typeof parsed === "object") delete parsed.factcheck_normalization_notes;
+  return normalizeAgent2Output(parsed);
+}
+
+// normalizeAgent2Output — deterministic consistency guard for the fact check.
+// The Phase 3 live run returned is_valid: false with issues the model itself
+// called "not a real problem", and the CIO view keys its verdict on is_valid.
+// The prompt now forbids that, but the verdict is too important to trust to the
+// prompt alone, so it is DERIVED here: is_valid === (flagged_issues is empty).
+// Pure, idempotent, never mutates its input; every change is noted in Thai.
+export function normalizeAgent2Output(output) {
+  if (!output || typeof output !== "object" || Array.isArray(output)) return output;
+  const out = { ...output };
+  const notes = Array.isArray(output.factcheck_normalization_notes)
+    ? output.factcheck_normalization_notes.filter((n) => typeof n === "string")
+    : [];
+
+  // flagged_issues: keep non-empty strings only. A bare string is one issue.
+  const rawIssues = out.flagged_issues;
+  let issues;
+  if (rawIssues === undefined) {
+    issues = [];
+  } else if (Array.isArray(rawIssues)) {
+    issues = rawIssues.filter((i) => typeof i === "string" && i.trim() !== "");
+    if (issues.length !== rawIssues.length) {
+      notes.push("ตัดรายการ flagged_issues ที่ว่างหรือไม่ใช่ข้อความออก");
+    }
+  } else if (typeof rawIssues === "string" && rawIssues.trim() !== "") {
+    issues = [rawIssues];
+    notes.push("แปลง flagged_issues จากข้อความเดี่ยวเป็นรายการ");
+  } else {
+    issues = [];
+    notes.push("flagged_issues มีรูปแบบไม่ถูกต้อง — ตั้งเป็นรายการว่าง");
+  }
+  out.flagged_issues = issues;
+
+  const derived = issues.length === 0;
+  if (out.is_valid !== derived) {
+    notes.push(
+      derived
+        ? "ปรับ is_valid เป็น true — ไม่มีประเด็นที่ถูกระบุใน flagged_issues"
+        : `ปรับ is_valid เป็น false — มีประเด็นที่ถูกระบุ ${issues.length} ข้อ`,
+    );
+    out.is_valid = derived;
+  }
+
+  out.factcheck_normalization_notes = notes;
+  return out;
 }
 
 // ---------------------------------------------------------------------------

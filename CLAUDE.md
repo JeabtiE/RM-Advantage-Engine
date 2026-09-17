@@ -36,7 +36,8 @@ Evidence backing this choice (from CFA Charterholder workshop, July 11):
         ↓
 [3] Matching + Priority Scoring (deterministic JS — NO AI)
     - findAffectedClients(): match tickers/sectors to client holdings
-    - calculatePriority(): rank by % of portfolio affected
+      (single_company → ticker only; each match tagged matchedBy + direction)
+    - calculatePriority(): rank by % of portfolio affected (gross — never netted)
     - Output: "Of 300 clients, 80 affected — call these 12 first"
         ↓
 [4] Agent 2 — Fact Checker (LLM call #2)
@@ -124,39 +125,112 @@ The team already has a deployed personal finance dashboard. New frontend must fe
   sentiment: "positive" | "negative" | "neutral",
   reasoning: "",
   dislocation: { detected: true, description: "ทองลงทั้งที่ควรขึ้น..." } | { detected: false },
-  agent2Result: { is_valid, flagged_issues, adjusted_reasoning },
-  affectedClients: [ /* Client + matchedHoldings + priorityScore */ ],
+  agent2Result: { is_valid, flagged_issues, adjusted_reasoning, factcheck_normalization_notes },
+  analysis: { /* normalized Agent 1 output, incl. event_scope / sector_impacts / normalization_notes when present */ },
+  affectedClients: [ /* Client + matchedHoldings (with matchedBy, direction) + priorityScore */ ],
   reviewedBy: null, approvedAt: null
 }
 ```
 
 ## Agent Prompt Patterns (all must return JSON only, no markdown fences)
 
+All prompt text lives in `api/claude-agent.js` (the only Anthropic caller);
+`src/utils/claudeAPI.js` is a thin transport. Both Agent 1 and Agent 2 output
+pass through a deterministic server-side normalizer after parsing (below).
+
 ### Agent 1 — Impact + Dislocation Analyzer
-Input: news content + marketOutcome + all holdings summary
+Input: news content + marketOutcome + holdings summary (`TICKER (name, sector)` per line)
 Output:
 ```json
 {
   "affected_tickers": [],
   "affected_sectors": [],
   "sentiment": "positive|negative|neutral",
-  "expected_market_reaction": "what theory says should happen",
+  "event_scope": "systemic|sector|single_company",
+  "sector_impacts": [{ "sector": "banking", "direction": "positive|negative|neutral" }],
   "dislocation_detected": true,
   "dislocation_description": "ทองลง 2.3% ทั้งที่ควรขึ้นในภาวะ risk-off — อาจเป็นโอกาสสะสม",
   "reasoning": "max 2 lines"
 }
 ```
+- **event_scope** — `single_company`: news about one named company; no sector
+  expansion. `sector`: one industry; no second-order sectors. `systemic`: macro /
+  market-wide (rates, tariffs, FX, risk-off); second-order expansion allowed and
+  must be justified in `reasoning`.
+- **sector_impacts** — one entry per affected sector. Sectors must be the held
+  sectors from the holdings summary. Mixed directions are expected (a rate hike:
+  banking positive, property negative); top-level `sentiment` is the net read and
+  never overrides a per-sector direction.
+- **Ticker discipline** — for `systemic` / `sector` events, `affected_tickers`
+  holds only companies named in the news or with company-specific exposure stated
+  in the reasoning; sector-wide exposure goes in `affected_sectors` /
+  `sector_impacts`. Prompt guidance only — there is deliberately no server-side
+  ticker cap (a cap would silently drop a legitimately named company).
+
+**`normalizeAgent1Output(output, heldSectors)`** (pure, idempotent; held sectors
+are read from the same holdings summary Agent 1 saw):
+- Lowercases/trims every sector string; exact duplicates in `affected_sectors` collapse.
+- Non-array `affected_tickers` / `affected_sectors` → `[]` (matching.js would throw).
+- `sector_impacts`: non-array → removed; entries without a sector, or for a
+  sector the book doesn't hold → dropped; unknown direction → `"neutral"`;
+  duplicate sector → first entry wins; extra keys stripped.
+- **Union:** every `sector_impacts` sector is added to `affected_sectors` (matching
+  decides sector matches from `affected_sectors` only, so an omission would
+  silently drop those clients). Sectors are never removed from `affected_sectors`,
+  and no `sector_impacts` entry is invented for a sector that lacks one (matching
+  falls back to top-level `sentiment`).
+- Invalid `event_scope` → field removed (matching defaults to `systemic`).
+- `event_scope: "single_company"` with an **empty** `affected_tickers` → changed to
+  `"sector"` (it would otherwise match no client). Note: a non-empty list of
+  tickers nobody holds is NOT downgraded.
+- Every change is recorded in `normalization_notes` (Thai, shown to the CIO).
+  Model-written `normalization_notes` are discarded before normalizing, and the
+  notes are never sent to Agent 2.
 
 ### Agent 2 — Fact Checker
-Input: original news + Agent 1 output
+Input: original news + Agent 1 output (minus `normalization_notes`)
 Output: `{ "is_valid": bool, "flagged_issues": [], "adjusted_reasoning": "" }`
 
+Checks: (1) dislocation honesty, (2) sentiment direction, (3) narrative grounding,
+(4) `event_scope` consistent with the news text, (5) each `sector_impacts`
+direction supported by — or reasonably inferred from — the news/marketOutcome
+(flag only a contradicted or baseless direction; never flag WHICH sectors or
+tickers were listed — that stays out of scope, see the dislocation-analysis skill §6).
+- **Source-only verification:** judge claims only against the provided news
+  content and marketOutcome; never flag a name, date, figure or event as wrong
+  from background knowledge, which may be outdated.
+- `flagged_issues` lists only approval-blocking problems; observations the model
+  concludes are acceptable are not listed.
+
+**`normalizeAgent2Output(output)`** (pure, idempotent): `is_valid` is DERIVED —
+true iff `flagged_issues` is empty. Missing issues → `[]`; blank/non-string issues
+dropped; a bare string becomes a one-item list. Changes are recorded in
+`factcheck_normalization_notes` (Thai, shown to the CIO only when present);
+model-written notes of that name are discarded.
+
 ### Agent 3 — Script Generator (per client)
-Input: approved analysis + client (name, riskProfile, matchedHoldings)
+Input: approved analysis + client (name, riskProfile, matchedHoldings incl. `direction` when present)
 Output: `{ "script": "Thai, max 3 sentences, informational tone, NEVER directive" }`
 - conservative → cautious wording
 - aggressive → direct wording
 - ALWAYS informational framing, never "ควรซื้อ/ควรขาย"
+- Each holding is described in its tagged direction; a client with both positive
+  and negative holdings gets both sides mentioned briefly (still no rebalancing
+  suggestion).
+- Endpoint validation: `matchedHoldings[].direction` ∈ positive|negative|neutral
+  and `matchedBy` ∈ ticker|sector when present (optional — cached runs lack them).
+
+### Matching output (deterministic, matching.js)
+`findAffectedClients()` returns each affected client with `matchedHoldings`
+(each holding + `matchedBy: "ticker"|"sector"`, ticker wins if both, and
+`direction`: the sector's `sector_impacts` direction, else top-level `sentiment`,
+else `"neutral"`) and `priorityScore`.
+- `event_scope: "single_company"` → match by ticker only; otherwise ticker OR sector.
+- Missing/unknown scope → `systemic`. `sector_impacts` only sets direction; it
+  never widens the match set.
+- **priorityScore is GROSS exposure** (`calculatePriority`, unchanged): positive
+  and negative holdings both add weight, never netted — a client with offsetting
+  exposures still needs an RM conversation.
 
 ## Hard Constraints (never violate)
 
@@ -190,12 +264,25 @@ sector expansion lands cleanly (N003 correctly narrows to 3 of 10). Real
 single-company news exposes it. This is PRE-EXISTING matching/Agent 1 behavior,
 not a live-mode bug.
 
-**Mitigation — deliberate, NOT a code fix:** the demo stays on the audited
-N006/N003 cached scenarios. Live mode carries an up-front UI caveat
-(NewsFeed.jsx, live-mode notice) so the limitation is disclosed rather than
-discovered. Decision (Phase 13): do NOT modify matching.js or the Agent 1 prompt
-to fix this before the deadline — the blast radius covers the money-shot
-scenario, and the fix is not demo-critical.
+**Mitigation (hackathon, Phase 13):** the demo stayed on the audited N006/N003
+cached scenarios, and live mode carries an up-front UI caveat (NewsFeed.jsx,
+live-mode notice).
+
+**Status now (post-hackathon Phases 2–3):** addressed in live mode. Agent 1
+classifies `event_scope`, and matching.js matches `single_company` news by ticker
+only. Verified live 2026-09-17: the same CPN item → `single_company`, **2 of 10
+clients** (C007, C003 — both hold CPN). The cached N006/N003 runs predate these
+fields and behave exactly as before. The NewsFeed caveat is still shown; the
+README still lists the limitation.
+
+### Neutral sector impacts still match (known, not yet addressed)
+
+A sector listed with `direction: "neutral"` is still in `affected_sectors`, so
+its holders match and their weight counts toward gross `priorityScore`. Live
+2026-09-17, FOMC fixture: energy/technology/healthcare were tagged neutral, so all
+10 clients matched and C002 ranked at 100% on neutral-only holdings. Not changed
+yet — it is a matching/prioritization design decision (drop neutral-only matches,
+or rank them lower).
 
 ### Live mode cannot detect dislocation (by construction)
 
@@ -250,8 +337,8 @@ src/
     mockNews.js           — 5-6 pre-tested news items (include 1 dislocation case: Tariff/Gold)
     cachedDemoRun.js      — frozen pipeline output for N006/N003 (demo never calls the API)
   utils/
-    claudeAPI.js          — all 3 agent calls + callClaude() helper + retry
-    matching.js           — findAffectedClients() + calculatePriority() + buildHoldingsSummary()
+    claudeAPI.js          — thin transport: POSTs the 3 agent calls to /api/claude-agent (no prompts, no key)
+    matching.js           — findAffectedClients() (scope gate, matchedBy/direction) + calculatePriority() + buildHoldingsSummary()
     liveNews.js           — adapts /api/fetch-live-news items → pipeline news shape (live mode only)
     parseAI.js            — safeParseJSON + validators
   hooks/

@@ -138,8 +138,58 @@ canonical Tariff case. Agent 2's scope is deliberately narrowed to the claims it
 | `dislocation_detected` + `dislocation_description` | Agent 1 narrative | **Yes** — verify against market outcome |
 | `sentiment` direction | Agent 1 narrative | **Yes** — verify against news |
 | `reasoning` grounding (numbers, price moves, named precedents) | Agent 1 narrative | **Yes** — flag invented facts / dated reference cases |
-| `affected_tickers`, `affected_sectors` | Agent 1 mapping → `matching.js` | **No** — expected expansion, judged by the deterministic matcher, not the fact checker |
+| `event_scope` | Agent 1 classification | **Yes** — is it consistent with the news text? (§7) |
+| `sector_impacts[].direction` | Agent 1 narrative | **Yes** — flag only a direction the source contradicts or gives no causal basis for |
+| `affected_tickers`, `affected_sectors`, *which* sectors appear in `sector_impacts` | Agent 1 mapping → `matching.js` | **No** — expected expansion, judged by the deterministic matcher, not the fact checker |
 
 Rule of thumb: the fact check verifies the **story** (is the dislocation real,
 is the direction right, are the facts invented?), not the **tagging** (which
 tickers/sectors) — the tagging is deterministic downstream and needs no LLM sign-off.
+
+**Source-only verification.** Agent 2 judges claims only against the provided
+news content and market outcome. It must never flag a name, date, figure or
+event as wrong from its own background knowledge, which may be outdated (e.g. a
+rate level or a policy decision newer than the model's training data).
+
+**Verdict consistency.** `flagged_issues` lists only problems that should block
+CIO approval — an observation the model concludes is acceptable is not listed.
+The server enforces the verdict deterministically (`normalizeAgent2Output`):
+`is_valid` is true iff `flagged_issues` is empty, and any correction is shown to
+the CIO in `factcheck_normalization_notes`. (Phase 3 live run: a Fed-hike item
+came back `is_valid: false` with issues the model itself called "not a real
+problem" — this guard makes that impossible.)
+
+## 7. Event Scope and Sector Direction (Agent 1 output)
+
+Agent 1 classifies how far a news event should expand **before** tagging, and
+states a direction per sector. Both feed `matching.js`.
+
+| `event_scope` | Meaning | Expansion |
+|---|---|---|
+| `single_company` | News about one named company (a deal, earnings, a contract) | None — matching uses tickers only, so the rest of the sector is not swept in |
+| `sector` | News about one industry as a whole | That sector only — no second-order sectors |
+| `systemic` | Macro / market-wide (rates, tariffs, FX, oil shocks, risk-off) | Second-order expansion via the §4 mappings, justified in `reasoning` |
+
+- **`sector_impacts`** — one `{ sector, direction }` per affected sector, using
+  only the held sectors from the holdings summary. Mixed directions are normal: a
+  rate hike is `banking: positive`, `property: negative` at once (§4 rule of
+  thumb). Top-level `sentiment` is only the net read and never overrides them.
+- **Ticker discipline** — for `systemic` / `sector` events, `affected_tickers`
+  lists only companies named in the news or with company-specific exposure stated
+  in the reasoning. Sector-wide exposure belongs in `affected_sectors` /
+  `sector_impacts`; the matcher already reaches every holder of the sector. This
+  is prompt guidance only — no server-side cap, because a cap cannot tell a sweep
+  from a legitimately named list and would silently drop a company.
+  (Live 2026-09-17: N006 went from 22 tickers to 0; the client list was unchanged.)
+
+**Server-side normalization (`normalizeAgent1Output`)** makes these fields
+consistent before matching, and lists every change in `normalization_notes` for
+the CIO:
+- sector strings lowercased/trimmed; unheld or malformed `sector_impacts` entries
+  dropped; unknown direction → `neutral`; duplicate sector → first entry wins;
+- **union** — every `sector_impacts` sector is added to `affected_sectors`
+  (otherwise its holders would silently drop off the call list); sectors are never
+  removed, and no direction is invented for a sector without one;
+- invalid `event_scope` → removed (matching treats it as `systemic`);
+- `single_company` with an **empty** `affected_tickers` → `sector`, since it would
+  match no client (a non-empty list of unheld tickers is not downgraded).
