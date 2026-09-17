@@ -3,13 +3,16 @@
 // case (N006 — the demo money shot) through analyzeImpact() and prints the
 // full parsed result so we can eyeball the dislocation reasoning.
 //
+// Agent calls go through /api/claude-agent, so start the dev server first with
+// ANTHROPIC_API_KEY and LIVE_AGENT_ENABLED=true in .env (`npm run dev`), then:
+//
 // Run it (PowerShell):
-//   $env:ANTHROPIC_API_KEY = "sk-ant-..."; node src/test-agent1.js
+//   $env:AGENT_ENDPOINT_BASE = "http://localhost:5173"; node src/test-agent1.js
 //
 // Run it (bash / macOS / Linux):
-//   ANTHROPIC_API_KEY="sk-ant-..." node src/test-agent1.js
+//   AGENT_ENDPOINT_BASE="http://localhost:5173" node src/test-agent1.js
 //
-// Requires Node 18+ (global fetch). No build step, no Vite — plain node ESM.
+// Requires Node 18+ (global fetch). This script itself never needs the key.
 
 import {
   analyzeImpact,

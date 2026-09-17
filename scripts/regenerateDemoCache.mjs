@@ -18,7 +18,9 @@
 //        editing the Agent prompts or the mock data). This is NOT part of the
 //        normal build or the demo path — the demo READS the cache, never writes it.
 //
-// HOW:   npm run regen:cache      (needs ANTHROPIC_API_KEY in .env — read below)
+// HOW:   1. .env: ANTHROPIC_API_KEY=... and LIVE_AGENT_ENABLED=true
+//        2. npm run dev               (serves /api/claude-agent)
+//        3. npm run regen:cache       (AGENT_ENDPOINT_BASE defaults to localhost:5173)
 //
 // SAFETY: Refuses to overwrite the cache unless EVERY gate passes for EVERY
 //         scenario (expected dislocation verdict, fact check clean, all scripts
@@ -27,7 +29,7 @@
 //         silently corrupt the demo content. Gates are all-or-nothing across
 //         scenarios on purpose: a half-written cache is worse than a stale one.
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { analyzeImpact, factCheck, generateAllScripts } from "../src/utils/claudeAPI.js";
 import { findAffectedClients, buildHoldingsSummary } from "../src/utils/matching.js";
 import { mockNews } from "../src/data/mockNews.js";
@@ -42,12 +44,13 @@ const CACHED_SCENARIOS = [
 ];
 const CACHE_PATH = new URL("../src/data/cachedDemoRun.js", import.meta.url);
 
-// Load ANTHROPIC_API_KEY from .env into process.env (claudeAPI.getApiKey reads
-// it there under node). Kept out of the shell so the key is never echoed.
-for (const line of readFileSync(new URL("../.env", import.meta.url), "utf8").split("\n")) {
-  const m = line.match(/^\s*ANTHROPIC_API_KEY\s*=\s*(.+?)\s*$/);
-  if (m) process.env.ANTHROPIC_API_KEY = m[1];
-}
+// Agent calls go through /api/claude-agent (claudeAPI.js no longer talks to
+// Anthropic directly), so this script needs a running endpoint rather than the
+// key. Default to the local Vite dev server; that server must have
+// ANTHROPIC_API_KEY and LIVE_AGENT_ENABLED=true in .env, or every call returns
+// 503 live_mode_disabled and the gates below abort without touching the cache.
+process.env.AGENT_ENDPOINT_BASE ??= "http://localhost:5173";
+console.log(`Using agent endpoint at ${process.env.AGENT_ENDPOINT_BASE}`);
 
 const die = (msg) => {
   console.error(`\n✗ ABORTED — ${msg}\n  (cache file left unchanged)\n`);

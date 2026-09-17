@@ -30,6 +30,7 @@ export default function App() {
     draft,
     scripts,
     error,
+    errorCode,
     relevance,
     analyzeNews,
     approve,
@@ -94,6 +95,7 @@ export default function App() {
             status={status}
             draft={draft}
             error={error}
+            errorCode={errorCode}
             relevance={relevance}
             analyzeNews={analyzeNews}
             reset={reset}

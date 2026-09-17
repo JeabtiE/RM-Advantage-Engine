@@ -11,6 +11,7 @@
 //     status      — current DraftStatus
 //     draft       — the draft (pending → drives the results hero) or null
 //     error       — pipeline error message or null
+//     errorCode   — endpoint error code or null ("live_mode_disabled" → notice, not failure)
 //     relevance   — pre-filter verdict for the last analyzed item (or null)
 //     analyzeNews — (news) => void   (runs Agent 1 → matching → Agent 2)
 //     reset       — () => void       (clears a stale draft on re-selection)
@@ -25,6 +26,14 @@ import { DraftStatus } from "../hooks/useDraft.js";
 import { calculateImpactShare, isKeyAccount } from "../utils/matching.js";
 import { fetchLiveNews, isLiveNewsId } from "../utils/liveNews.js";
 import KeyAccountBadge from "./KeyAccountBadge.jsx";
+import { LIVE_MODE_DISABLED } from "../utils/claudeAPI.js";
+import { cachedDemoRuns } from "../data/cachedDemoRun.js";
+
+// Preset items that resolve from the frozen cache (no API call). Derived from the
+// cache itself so the "still works" list can never drift from what is cached.
+const CACHED_DEMO_NEWS = mockNews.filter((n) =>
+  Object.hasOwn(cachedDemoRuns, n.id),
+);
 
 // News sources the RM can pick between. "preset" is the audited demo path
 // (mockNews + the N006/N003 cache); "live" pulls real headlines off Yahoo
@@ -71,6 +80,7 @@ export default function NewsFeed({
   status,
   draft,
   error,
+  errorCode,
   relevance,
   analyzeNews,
   reset,
@@ -265,8 +275,34 @@ export default function NewsFeed({
           )}
         </section>
 
+        {/* Live analysis switched off server-side (LIVE_AGENT_ENABLED unset) —
+            the public deployment's normal state, not a failure. Neutral card,
+            no retry button (retrying cannot succeed), and a pointer to the
+            cached scenarios that run with zero API calls. */}
+        {status === DraftStatus.ERROR && errorCode === LIVE_MODE_DISABLED && (
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-2">
+              <span className="inline-block h-2 w-2 rounded-full bg-slate-400" />
+              <p className="text-sm font-semibold text-slate-700">
+                การวิเคราะห์สด (live analysis) ปิดอยู่บนเดโมสาธารณะ
+              </p>
+            </div>
+            <p className="mt-2 text-xs leading-relaxed text-slate-500">
+              ข่าวนี้ต้องเรียก AI แบบสด ซึ่งปิดไว้เพื่อป้องกันการใช้ API key โดยไม่ได้รับอนุญาต
+              ข่าวต่อไปนี้มีผลวิเคราะห์สำรองไว้ (cached demo) และใช้งานได้ครบทุกขั้นตอน:
+            </p>
+            <ul className="mt-2 space-y-1">
+              {CACHED_DEMO_NEWS.map((n) => (
+                <li key={n.id} className="text-xs font-medium text-slate-700">
+                  • {n.headline}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         {/* Error state */}
-        {status === DraftStatus.ERROR && (
+        {status === DraftStatus.ERROR && errorCode !== LIVE_MODE_DISABLED && (
           <section className="rounded-2xl border border-rose-200 bg-rose-50 p-5">
             <p className="text-sm font-semibold text-rose-700">
               การวิเคราะห์ล้มเหลว
