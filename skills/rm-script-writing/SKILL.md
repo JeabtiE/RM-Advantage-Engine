@@ -85,6 +85,28 @@ indirect mechanism honestly:
 Indirect and honest beats generic every time. There is always a specific holding to name —
 name it. Never retreat to "may be relevant to your portfolio" because the link is second-order.
 
+### Direction per holding — mixed exposure
+Live matched holdings carry a `direction` (`positive` / `negative` / `neutral`), taken
+from Agent 1's per-sector `sector_impacts` (see the dislocation-analysis skill §7). The
+Agent 3 prompt lists it next to each holding (`KBANK (…) — direction: positive`); cached
+demo runs predate the field and omit it.
+
+- Describe each holding in the direction it is tagged — never call a `negative` holding a
+  beneficiary, or vice versa.
+- When a client holds **both** positive and negative holdings, mention both sides briefly,
+  within the same sentence limit:
+  > "หุ้น KBANK ในพอร์ตได้แรงหนุนจากดอกเบี้ยที่สูงขึ้น ขณะที่ LH อาจถูกกดดันจากต้นทุนสินเชื่อ"
+- Presenting both sides is information, not a rebalancing suggestion — never tell the client
+  to shift from one to the other.
+
+### Sector mechanism per holding
+Each sector in Agent 1's `sector_impacts` carries a `reason` — one short, fact-checked Thai
+sentence giving the mechanism (e.g. "ดอกเบี้ยที่สูงขึ้นเพิ่มต้นทุนสินเชื่อที่อยู่อาศัย" for property).
+The Agent 3 prompt appends it to each matched holding as `— sector mechanism: …`, looked up by
+the holding's sector. Use it as the §3 mechanism for that holding, in plain words; do not add
+figures, events or company facts beyond it and the approved insight. Holdings without one
+(cached runs, or a sector with no stated reason) fall back to the approved reasoning as before.
+
 ## 4. Tone by Risk Profile
 
 Tone changes the framing, not the informational stance. Every profile stays
