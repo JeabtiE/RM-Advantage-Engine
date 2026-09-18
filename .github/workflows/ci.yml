@@ -1,0 +1,47 @@
+name: CI
+
+# Runs the full test suite and a production build on every push to main and on
+# every pull request targeting main.
+#
+# NO SECRETS BY DESIGN: CI must never hold an Anthropic API key. Every test stubs
+# the model call (globalThis.fetch is replaced, or the module under test is
+# pure), so the suite needs no credentials and makes no outbound network calls.
+# LIVE_AGENT_ENABLED is likewise never set here — the tests that need it set it
+# themselves, in-process, and delete it afterwards. If a future test genuinely
+# needs a key, stub it instead: a key in CI would be readable from any fork PR
+# workflow run and would spend real credit on every push.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Tests + build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      # Node 24 matches the local toolchain this project is developed on
+      # (node:test glob runner, structuredClone). npm cache keyed on the lockfile.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      # ci (not install): installs exactly what package-lock.json pins and fails
+      # if the lockfile and package.json have drifted apart.
+      - name: Install dependencies
+        run: npm ci
+
+      # node --test "tests/*.test.js" && node src/test-filter.js
+      - name: Run tests
+        run: npm test
+
+      # vite build — also catches a broken import that tests alone would miss.
+      - name: Build
+        run: npm run build

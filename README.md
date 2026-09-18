@@ -1,5 +1,7 @@
 # RM Advantage Engine
 
+[![CI](https://github.com/JeabtiE/RM-Advantage-Engine/actions/workflows/ci.yml/badge.svg)](https://github.com/JeabtiE/RM-Advantage-Engine/actions/workflows/ci.yml)
+
 **A News-to-Action Intelligence Platform for Relationship Managers in Thai wealth management.**
 
 > "เราไม่ได้สร้างเครื่องมืออ่านข่าวให้ RM เราสร้างเครื่องมือที่ทำให้ RM มีอะไรที่ลูกค้าอ่านเองไม่ได้"
