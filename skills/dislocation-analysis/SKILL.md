@@ -58,8 +58,8 @@ Under standard risk-off logic, gold and US government bonds — the two classic
 safe havens — should have risen. Instead **both fell**: gold dropped −2.3% and
 the US 10-year sold off. Safe havens declining *during* a risk-off shock is the
 dislocation. It suggested forced liquidation / a dash for cash rather than an
-orderly flight to safety — and framed gold's decline as a potential
-accumulation opportunity rather than a warning sign.
+orderly flight to safety — and marked gold's decline as a possible mispricing
+rather than a warning sign.
 
 This is our canonical worked example. Any new case should be reasoned through
 the same table format.
@@ -111,6 +111,15 @@ being within normal market noise. Consider:
 - **Alternative explanations** — is there a simpler cause (unrelated news, a
   data artifact, a known technical flow) that explains the move without a true
   dislocation?
+
+**Limits (enforced in the Agent 1 prompt and checked by Agent 2, check 6).**
+The description and reasoning use only facts from the news content and market
+outcome, plus mechanisms from the §4 table. They never contradict explicit forward
+guidance in the source (e.g. if the dot plot signals another hike, do not infer the
+rate cycle has peaked), and they never suggest an action — buy, sell, accumulate,
+reduce, add, trim, take profit, rebalance, or Thai equivalents (ซื้อ, ขาย, สะสม,
+ทยอยสะสม, ลดสัดส่วน, เพิ่มสัดส่วน, ขายทำกำไร). Say what the gap may indicate, never
+what to do about it.
 
 Frame the confidence honestly. A flagged dislocation that turns out to be noise
 wastes an RM's most valuable resource — a client's attention — so it is better

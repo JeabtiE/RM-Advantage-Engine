@@ -11,7 +11,11 @@ import assert from "node:assert/strict";
 
 import { readFileSync } from "node:fs";
 
-import handler, { SECTOR_MECHANISM_TABLE, MAX_SCRIPT_CHARS } from "../api/claude-agent.js";
+import handler, {
+  SECTOR_MECHANISM_TABLE,
+  MAX_SCRIPT_CHARS,
+  AGENT3_FEW_SHOT_EXAMPLES,
+} from "../api/claude-agent.js";
 import { mockNews } from "../src/data/mockNews.js";
 import { cachedDemoRuns } from "../src/data/cachedDemoRun.js";
 import { buildHoldingsSummary } from "../src/utils/matching.js";
@@ -385,6 +389,52 @@ test("sentiment is defined as the expected pre-reaction impact in both prompts",
   assert.match(a1, /belongs ONLY in dislocation_detected \/ dislocation_description/);
   assert.match(a2, /Flag it ONLY if it is inconsistent with the sector_impacts directions/);
   assert.match(a2, /NEVER flag sentiment for diverging from the actual market reaction when a dislocation is described/);
+});
+
+test("Agent 1 prompt limits dislocation/reasoning: source facts, shared table, forward guidance, no actions", async () => {
+  const a1 = await systemPromptFor(impactBody());
+  assert.match(a1, /## Limits on dislocation_description and reasoning/);
+  assert.match(a1, /use ONLY facts stated in the news content and market outcome/);
+  assert.match(a1, /use ONLY the shared sector table above/);
+  assert.match(a1, /never contradict explicit forward guidance stated in the source/);
+  assert.match(a1, /never suggest or imply an action/);
+  for (const word of ["accumulate", "สะสม", "ลดสัดส่วน"]) assert.ok(a1.includes(word), word);
+  assert.match(a1, /never an action \(see Limits\)/);
+  // The canonical reference case no longer models accumulation framing.
+  assert.ok(!/accumulation opportunity/.test(a1));
+  assert.match(a1, /possible mispricing rather than a warning sign/);
+});
+
+test("Agent 2 prompt has blocking check 6: action language and contradicted forward guidance", async () => {
+  const a2 = await systemPromptFor({ agent: "factcheck", news: n006, agent1Output: n006Run.analysis });
+  assert.match(a2, /6\. Action language and forward guidance — flag as a blocking issue/);
+  assert.match(a2, /recommends or suggests an action/);
+  assert.match(a2, /contradicts explicit forward guidance stated in the source/);
+  // Check 6 sits before the shared table, inside "What to check".
+  assert.ok(a2.indexOf("6. Action language") < a2.indexOf("## Shared sector table"));
+});
+
+test("Agent 3 few-shot examples: in the prompt verbatim, within the cap, mechanisms hedged, facts plain", async () => {
+  const a3 = await systemPromptFor({
+    agent: "script",
+    analysis: n006Run.analysis,
+    client: n006Run.affectedClients[0],
+  });
+  const skill = readFileSync(new URL("../skills/rm-script-writing/SKILL.md", import.meta.url), "utf8")
+    .replace(/\r\n/g, "\n");
+  assert.equal(AGENT3_FEW_SHOT_EXAMPLES.length, 4);
+  for (const { label, script } of AGENT3_FEW_SHOT_EXAMPLES) {
+    assert.ok(a3.includes(`${label}:\n"${script}"`), `${label} rendered in prompt`);
+    assert.ok(skill.includes(`> "${script}"`), `${label} in sync with the skill doc`);
+    assert.ok(script.length <= MAX_SCRIPT_CHARS, `${label}: ${script.length} chars`);
+    assert.ok(/มีแนวโน้ม|อาจ/.test(script), `${label}: mechanism hedged`);
+    assert.ok(script.includes("2.3%"), `${label}: reported figure stated`);
+    // Phrasings that stated an unreported per-stock effect as fact.
+    for (const bad of ["กระแทก", "กดดันหุ้นกลุ่มส่งออกโดยตรง", "ถืออยู่ได้รับแรงกดดัน", "ควรซื้อ", "ควรขาย"]) {
+      assert.ok(!script.includes(bad), `${label}: contains "${bad}"`);
+    }
+  }
+  assert.match(a3, /No individual stock's move is reported/);
 });
 
 test("MAX_SCRIPT_CHARS = longest accepted cached script rounded up to the nearest 50", () => {

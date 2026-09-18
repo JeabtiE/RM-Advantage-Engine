@@ -139,12 +139,19 @@ export function useDraft() {
     const cached = getCachedRun(news.id);
     if (cached) {
       await sleep(DEMO_CACHE_DELAY_MS); // cosmetic; shows the analyzing state
-      const { analysis } = cached;
+      // A CIO-reviewed cache entry keeps the AI's original analysis untouched
+      // and adds reviewedAnalysis (what matching + Agent 3 used). The draft
+      // works on the reviewed version and carries the original + the review so
+      // ApprovalDashboard can show exactly what the CIO changed.
+      const analysis = cached.reviewedAnalysis ?? cached.analysis;
       setDraft({
         draftId: news.id,
         status: DraftStatus.PENDING,
         newsSource: { headline: news.headline, content: news.content },
         analysis,
+        ...(cached.cioReview
+          ? { aiAnalysis: cached.analysis, cioReview: cached.cioReview }
+          : {}),
         affectedTickers: analysis.affected_tickers ?? [],
         affectedSectors: analysis.affected_sectors ?? [],
         sentiment: analysis.sentiment,

@@ -122,12 +122,17 @@ A global tariff announcement is an archetypal risk-off event.
 | Global equities | Fall | Fell | No |
 | Gold | Rise (safe haven) | Fell -2.3% | YES |
 | US 10Y Treasuries | Rally | Sold off | YES |
-Both classic safe havens FELL during a risk-off shock. That is the dislocation — it signaled forced liquidation / a dash for cash rather than an orderly flight to safety, and framed gold's decline as a possible accumulation opportunity rather than a warning.
+Both classic safe havens FELL during a risk-off shock. That is the dislocation — it signaled forced liquidation / a dash for cash rather than an orderly flight to safety, and marked gold's decline as a possible mispricing rather than a warning sign.
 
 IMPORTANT — this April 2025 reference case is INTERNAL teaching context only. It exists solely to help you recognize the dislocation PATTERN. It is NOT part of the news you are analyzing. Never name it, date it ("April 2025", "เมษายน 2025"), or cite it as a precedent/analogy in the "dislocation_description" or "reasoning" output fields. Those two fields must describe ONLY what is present in the actual news content and marketOutcome provided below, in your own words. A downstream fact checker sees only the news — any reference to this canonical case will read as an unsupported (hallucinated) claim.
 
 ## Thai (SET) sector -> macro-factor mappings (use to build the Step 1 expectation)
 ${SECTOR_MECHANISM_TABLE}
+
+## Limits on dislocation_description and reasoning
+- Facts: use ONLY facts stated in the news content and market outcome. Mechanisms: use ONLY the shared sector table above (plus the dislocation methodology).
+- Forward guidance: never contradict explicit forward guidance stated in the source. If the source says, for example, that the dot plot signals another hike, do not infer that the rate cycle has peaked; state the guidance as a source of uncertainty instead.
+- No actions: never suggest or imply an action — buy, sell, accumulate, reduce, add, trim, take profit, rebalance, or Thai equivalents such as ซื้อ, ขาย, สะสม, ทยอยสะสม, ลดสัดส่วน, เพิ่มสัดส่วน, ขายทำกำไร. Describe what the gap between expected and actual may indicate and how confident you are — never what anyone should do about it.
 
 ## Confidence
 Judge a flagged dislocation honestly: magnitude (large vs within normal daily range), breadth (multiple correlated factors diverging = higher confidence, one in isolation = likely noise), and simpler alternative explanations. A false flag wastes an RM's most valuable resource — a client's attention — so label borderline cases conservatively.
@@ -161,7 +166,7 @@ Return ONLY a JSON object, no markdown fences, no prose around it, with exactly 
   "event_scope": "systemic" | "sector" | "single_company",
   "sector_impacts": [ { "sector": string, "direction": "positive" | "negative" | "neutral", "reason": string } ],   // one entry per affected sector; reason = one short Thai sentence (see above)
   "dislocation_detected": boolean,     // true only if actual reaction genuinely diverges from expected
-  "dislocation_description": string,   // Thai. State (a) what was expected, (b) what actually happened, (c) the opportunity/confidence. Empty string if none.
+  "dislocation_description": string,   // Thai. State (a) what was expected, (b) what actually happened, (c) what the gap may indicate and your confidence — never an action (see Limits). Empty string if none.
   "reasoning": string                  // Thai, max 2 lines. The causal chain, not a news summary. For systemic events, it must justify the sectors you expanded to.
 }
 Write dislocation_description and reasoning in Thai (the RM-facing language). Keep the JSON keys and enum values in English exactly as above.`;
@@ -526,6 +531,7 @@ const AGENT2_SYSTEM_PROMPT = `You are a compliance-minded fact checker on a Thai
    - the reason introduces factual claims not present in the source (figures, events, company-specific facts);
    - the reason describes a mechanism that does not fit that sector according to the SHARED SECTOR TABLE below (e.g. calling transport a "bond proxy" — only utilities/power and telecom are bond proxies there). Judge mechanisms against that table, not your own sector taxonomy.
    A general, sector-appropriate economic mechanism (e.g. "higher rates raise borrowing costs" for property) is acceptable even though the source does not spell it out — do NOT flag it. Do not flag WHICH sectors are listed — only each entry's direction and reason.
+6. Action language and forward guidance — flag as a blocking issue any dislocation_description or reasoning text that (a) recommends or suggests an action (buy, sell, accumulate, reduce, add, trim, take profit, rebalance, or Thai equivalents such as ซื้อ, ขาย, สะสม, ทยอยสะสม, ลดสัดส่วน, เพิ่มสัดส่วน, ขายทำกำไร), or (b) contradicts explicit forward guidance stated in the source (e.g. inferring the rate cycle has peaked when the source says the dot plot signals another hike). Describing what a gap may indicate is fine; telling anyone what to do is not.
 
 ## Shared sector table (the SAME reference the analyst used)
 ${SECTOR_MECHANISM_TABLE}
@@ -658,6 +664,37 @@ export function normalizeAgent2Output(output) {
 // Over-long scripts are flagged (length_exceeded), never truncated.
 export const MAX_SCRIPT_CHARS = 600;
 
+// AGENT3_FEW_SHOT_EXAMPLES — the Tariff/Gold few-shot scripts in the Agent 3
+// prompt. They must model the facts-vs-mechanisms rule, because the model copies
+// their style: REPORTED figures from the scenario (tariffs announced, global
+// equities fell, gold -2.3%, treasuries sold off, risk-off selling) are stated
+// plainly; the effect on the client's own stock is a MECHANISM (no per-stock move
+// is reported), so it is hedged ("มีแนวโน้ม", "อาจ"). Each stays within
+// MAX_SCRIPT_CHARS (a test checks both). Exported for those tests.
+export const AGENT3_FEW_SHOT_EXAMPLES = [
+  {
+    label: "conservative (client holds DELTA)",
+    script:
+      "เรียนคุณสมชายครับ สหรัฐประกาศขึ้นภาษีนำเข้าทั่วโลกและตลาดหุ้นทั่วโลกปรับตัวลง ซึ่งอาจกดดันหุ้นส่งออกอย่าง DELTA ที่คุณสมชายถืออยู่ เพราะกำแพงภาษีมีแนวโน้มเพิ่มต้นทุนการค้าและกระทบคำสั่งซื้อจากต่างประเทศ ที่ผิดปกติคือทองคำซึ่งควรเป็นสินทรัพย์ปลอดภัยกลับปรับลง 2.3% ซึ่งยังมีความไม่แน่นอนอยู่ หากคุณสมชายสนใจ ผมขอเรียนให้ทราบไว้เป็นข้อมูลและนัดคุยรายละเอียดเพิ่มเติมได้ครับ",
+  },
+  {
+    label: "moderate (client holds KCE)",
+    script:
+      "เรียนคุณวิภาครับ สหรัฐประกาศขึ้นภาษีนำเข้า ซึ่งมีแนวโน้มกระทบหุ้นส่งออกอย่าง KCE ที่คุณวิภาถืออยู่ เพราะรายได้หลักมาจากการส่งออกชิ้นส่วนที่อาจเผชิญกำแพงภาษีสูงขึ้น จุดที่น่าสนใจคือทองคำปรับลง 2.3% พร้อมตลาดหุ้น ทั้งที่ตามทฤษฎีควรเป็นสินทรัพย์ปลอดภัยที่ปรับขึ้น ซึ่งเป็นภาพที่ไม่ค่อยเกิดขึ้น หากคุณวิภาสนใจ เราพูดคุยรายละเอียดเพิ่มเติมกันได้ครับ",
+  },
+  {
+    label: "aggressive (client holds DELTA)",
+    script:
+      "เรียนคุณธนากรครับ สหรัฐประกาศขึ้นภาษีนำเข้าทั่วโลก ซึ่งมีแนวโน้มกดดันหุ้นส่งออกอย่าง DELTA ในพอร์ตของคุณธนากรมากเป็นพิเศษ เพราะพึ่งพารายได้จากการค้าระหว่างประเทศสูง แต่จุดที่ตลาดส่วนใหญ่มองข้ามคือทองคำปรับลง 2.3% ทั้งที่ในภาวะ risk-off ควรปรับขึ้น ซึ่งอาจสะท้อนแรงขายเพื่อเพิ่มสภาพคล่องมากกว่าการเปลี่ยนแปลงพื้นฐาน ผมมองว่าเป็นข้อมูลที่คุณธนากรน่าจะสนใจ หากอยากลงลึกโทรคุยกันได้เลยครับ",
+  },
+  {
+    label:
+      "Indirect-link example (client holds AOT — an airport stock, NOT a directly tariffed exporter, but still name it and state the indirect mechanism)",
+    script:
+      "เรียนคุณศิริพรครับ ข่าวขึ้นภาษีนำเข้าสหรัฐทำให้ตลาดเข้าสู่ภาวะ risk-off และมีแรงเทขายทั่วตลาด ซึ่งอาจกดดันหุ้น AOT ที่คุณศิริพรถืออยู่ด้วย แม้จะไม่ได้ถูกกระทบจากภาษีโดยตรง จุดที่น่าสนใจคือทองคำกลับปรับลง 2.3% ทั้งที่ควรเป็นสินทรัพย์ปลอดภัย ซึ่งอาจสะท้อนแรงขายเพื่อเพิ่มสภาพคล่อง หากคุณศิริพรสนใจ เราพูดคุยรายละเอียดเพิ่มเติมกันได้ครับ",
+  },
+];
+
 const AGENT3_SYSTEM_PROMPT = `You are an RM (relationship manager) at a Thai wealth-management firm writing a short phone script to call ONE client about an insight that has ALREADY been approved by the investment committee (Four Eyes). Your job is to convey the insight as information the client can consider — NOT to give investment advice.
 
 ## Core rule — informational only, never advice
@@ -683,15 +720,15 @@ Rule of thumb: if the sentence tells the client what to DO, rewrite it to tell t
 ## Personalization — name the holding and the mechanism (HARD REQUIREMENT, not a suggestion)
 This is the whole point of the call. An RM who says only "this news may be relevant to your portfolio" is no more useful than the client reading the news themselves — that is failure, not a soft miss. Every script MUST:
 1. Name at least ONE specific ticker from the client's affected holdings (the "Affected holdings in this client's portfolio" list below). Use the actual ticker symbol.
-2. Briefly state the MECHANISM connecting this news/dislocation to THAT holding — why this specific position is affected (e.g. "DELTA เป็นหุ้นส่งออก กำแพงภาษีเพิ่มต้นทุนการค้าและกระทบคำสั่งซื้อต่างประเทศ").
+2. Briefly state the MECHANISM connecting this news/dislocation to THAT holding — why this specific position is affected (e.g. "DELTA เป็นหุ้นส่งออก กำแพงภาษีมีแนวโน้มเพิ่มต้นทุนการค้าและกระทบคำสั่งซื้อต่างประเทศ").
 
 BANNED (an automatic failure): a generic relevance claim with no ticker and no mechanism — e.g. "ข้อมูลนี้อาจเกี่ยวข้องกับพอร์ตของคุณ" / "อาจกระทบพอร์ตของคุณ" standing alone. Never ship this.
 
-When the link is INDIRECT (the holding is caught in a broad move rather than hit head-on — e.g. a bank or airport stock in a market-wide risk-off selloff, not a directly tariffed exporter), you STILL name the ticker and state the indirect mechanism plainly ("หุ้น AOT ของคุณได้รับแรงกดดันจากการเทขายทั้งตลาดในภาวะ risk-off"). Indirect is fine and honest; generic is not. There is always a specific holding to name — name it.
+When the link is INDIRECT (the holding is caught in a broad move rather than hit head-on — e.g. a bank or airport stock in a market-wide risk-off selloff, not a directly tariffed exporter), you STILL name the ticker and state the indirect mechanism plainly ("หุ้น AOT ของคุณอาจได้รับแรงกดดันจากการเทขายทั้งตลาดในภาวะ risk-off"). Indirect is fine and honest; generic is not. There is always a specific holding to name — name it.
 
 ## Direction per holding — mixed exposure
 Each affected holding may be tagged with a direction: positive (the event tends to help it), negative (tends to hurt it), or neutral. Describe each holding's effect in the direction it is tagged — never call a "negative" holding a beneficiary or vice versa.
-When the client has BOTH positive and negative holdings, the script must mention both sides briefly (e.g. "หุ้น KBANK ในพอร์ตได้แรงหนุนจากดอกเบี้ยที่สูงขึ้น ขณะที่ LH อาจถูกกดดันจากต้นทุนสินเชื่อ"), still within the sentence limit. Presenting both sides is information, not a suggestion to rebalance — do not tell the client to shift between them.
+When the client has BOTH positive and negative holdings, the script must mention both sides briefly (e.g. "หุ้น KBANK ในพอร์ตมีแนวโน้มได้แรงหนุนจากดอกเบี้ยที่สูงขึ้น ขณะที่ LH อาจถูกกดดันจากต้นทุนสินเชื่อ"), still within the sentence limit. Presenting both sides is information, not a suggestion to rebalance — do not tell the client to shift between them.
 A holding may also carry a "sector mechanism": the approved, fact-checked reason this event moves that holding's sector. Use it to explain the effect on that holding in plain words. Do not add facts, figures or claims beyond it and the approved insight.
 
 ## Tone by risk profile
@@ -713,19 +750,9 @@ Address the client by name at the start.
 - Never present a mechanism as something that already happened to a specific stock (e.g. do not write that TRUE "was pressured" or DELTA "gained support") unless the approved insight reports that stock's actual move. "DELTA มีแนวโน้มได้แรงหนุนจากค่าเงินบาทที่อ่อนค่า" is fine; "DELTA ได้แรงหนุนแล้ว" is not, unless reported.
 
 ## Few-shot examples — Tariff/Gold dislocation case
-Scenario: Trump announces global import tariffs. Theory says gold should rise as a safe haven in a risk-off move, but gold actually fell 2.3% alongside equities and US treasuries — an unusual dislocation. Note across all three: EACH names the client's own affected holding (in caps) and the mechanism tying the news to THAT holding, then adds the dislocation as the differentiated insight; tone escalates from cautious to direct; NONE say buy/sell or "ควร…"; each ends with an invitation to talk.
+Scenario: Trump announces global import tariffs. Reported: global equities fell in a risk-off move with broad selling, gold fell 2.3% and US treasuries sold off — although theory says gold should rise as a safe haven. No individual stock's move is reported. Note across all four: EACH names the client's own affected holding (in caps) and the mechanism tying the news to THAT holding, hedged (มีแนวโน้ม / อาจ) because it is a mechanism, not a reported move; the reported figures (gold -2.3%) are stated plainly; tone escalates from cautious to direct; NONE say buy/sell or "ควร…"; each ends with an invitation to talk.
 
-conservative (client holds DELTA):
-"เรียนคุณสมชายครับ ข่าวการขึ้นภาษีนำเข้าของสหรัฐกดดันหุ้นกลุ่มส่งออกโดยตรง รวมถึง DELTA ที่คุณสมชายถืออยู่ เพราะกำแพงภาษีเพิ่มต้นทุนการค้าและกระทบคำสั่งซื้อจากต่างประเทศ ที่ผิดปกติคือทองคำซึ่งควรเป็นสินทรัพย์ปลอดภัยกลับปรับลง 2.3% สวนทางกับที่ควรจะเป็น ซึ่งยังมีความไม่แน่นอนอยู่ หากคุณสมชายสนใจ ผมขอเรียนให้ทราบไว้เป็นข้อมูลและนัดคุยรายละเอียดเพิ่มเติมได้ครับ"
-
-moderate (client holds KCE):
-"เรียนคุณวิภาครับ ข่าวการขึ้นภาษีนำเข้าของสหรัฐกระทบหุ้นส่งออกอย่าง KCE ที่คุณวิภาถืออยู่ เพราะรายได้หลักมาจากการส่งออกชิ้นส่วนที่ต้องเผชิญกำแพงภาษีสูงขึ้น จุดที่น่าสนใจคือทองคำกลับปรับลง 2.3% พร้อมตลาดหุ้น ทั้งที่ตามทฤษฎีควรเป็นสินทรัพย์ปลอดภัยที่ปรับขึ้น ซึ่งเป็นภาพที่ไม่ค่อยเกิดขึ้น หากคุณวิภาสนใจ เราพูดคุยรายละเอียดเพิ่มเติมกันได้ครับ"
-
-aggressive (client holds DELTA):
-"เรียนคุณธนากรครับ ข่าวภาษีนำเข้าสหรัฐกระแทกหุ้นส่งออกอย่าง DELTA ในพอร์ตของคุณธนากรโดยตรง เพราะเป็นกลุ่มที่พึ่งพารายได้จากการค้าระหว่างประเทศมากที่สุด แต่จุดที่ตลาดส่วนใหญ่มองข้ามคือทองคำปรับลง 2.3% ทั้งที่ในภาวะ risk-off ควรปรับขึ้น อาจสะท้อนแรงขายเพื่อเพิ่มสภาพคล่องมากกว่าการเปลี่ยนพื้นฐาน ผมมองว่าเป็นข้อมูลที่คุณธนากรน่าจะสนใจ หากอยากลงลึกโทรคุยกันได้เลยครับ"
-
-Indirect-link example (client holds AOT — an airport stock, NOT a directly tariffed exporter, but still name it and state the indirect mechanism):
-"เรียนคุณศิริพรครับ ข่าวขึ้นภาษีนำเข้าสหรัฐทำให้ตลาดเข้าสู่ภาวะ risk-off และหุ้น AOT ที่คุณศิริพรถืออยู่ได้รับแรงกดดันจากการเทขายทั้งตลาด แม้จะไม่ได้ถูกกระทบจากภาษีโดยตรง จุดที่น่าสนใจคือทองคำกลับปรับลง 2.3% ทั้งที่ควรเป็นสินทรัพย์ปลอดภัย ซึ่งอาจสะท้อนแรงขายเพื่อเพิ่มสภาพคล่อง หากคุณศิริพรสนใจ เราพูดคุยรายละเอียดเพิ่มเติมกันได้ครับ"
+${AGENT3_FEW_SHOT_EXAMPLES.map((e) => `${e.label}:\n"${e.script}"`).join("\n\n")}
 
 ## Output
 Return ONLY a JSON object, no markdown fences, no prose around it, with exactly this key:

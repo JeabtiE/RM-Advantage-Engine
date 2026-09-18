@@ -8,11 +8,16 @@
 //       determinism) at showtime. See CLAUDE.md hard constraint #5; this extends
 //       it from input caching to OUTPUT determinism.
 //
-//       Two scenarios are cached, and they tell DIFFERENT halves of the story:
+//       Three scenarios are cached:
 //         N006 (Tariff/Gold) — the dislocation money shot. All 10 clients match.
 //         N003 (AI exports)  — the priority-filtering shot. Only 3 of 10 match,
 //                              which is what makes the "call these first, not all
 //                              300" claim visible on screen.
+//         N007 (Fed hike)    — real Sep 2026 market data; dislocation human-reviewed.
+//
+//       --apply-cio-review <newsId> is the other mode: it applies a committed,
+//       human-authored src/data/cioReviews/<newsId>.json to the CACHED Agent 1
+//       output and regenerates Agent 3 only (Agent 1/2 are never called).
 //
 // WHEN:  Only when we deliberately want to refresh the demo content (e.g. after
 //        editing the Agent prompts or the mock data). This is NOT part of the
@@ -39,14 +44,20 @@
 //      for the demo. If it is not, discard the working-tree change (git) rather
 //      than committing it.
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { analyzeImpact, factCheck, generateAllScripts } from "../src/utils/claudeAPI.js";
 import { findAffectedClients, buildHoldingsSummary } from "../src/utils/matching.js";
 import { mockNews } from "../src/data/mockNews.js";
 import { rankingDiff, formatRankingDiff } from "./rankingDiff.mjs";
-import { MAX_SCRIPT_CHARS } from "../api/claude-agent.js";
+import {
+  MAX_SCRIPT_CHARS,
+  normalizeAgent1Output,
+  heldSectorsFromSummary,
+  heldTickersFromSummary,
+} from "../api/claude-agent.js";
+import { applyCioReview, reviewBlockers } from "../src/utils/cioReview.js";
 
 // The scenarios to freeze. expectDislocation is the verdict we VERIFIED is stable
 // for that news item across a 5x stress run — it is a gate, not a hint. If a
@@ -64,6 +75,10 @@ const CACHED_SCENARIOS = [
 const CACHE_PATH = process.env.REGEN_CACHE_PATH
   ? pathToFileURL(process.env.REGEN_CACHE_PATH)
   : new URL("../src/data/cachedDemoRun.js", import.meta.url);
+// Human-authored CIO review files (--apply-cio-review). CIO_REVIEW_DIR is a
+// test override, like REGEN_CACHE_PATH.
+const CIO_REVIEW_DIR =
+  process.env.CIO_REVIEW_DIR ?? fileURLToPath(new URL("../src/data/cioReviews/", import.meta.url));
 
 // Agent calls go through /api/claude-agent (claudeAPI.js no longer talks to
 // Anthropic directly), so this script needs a running endpoint rather than the
@@ -162,21 +177,9 @@ async function runScenario({ id, expectDislocation, note }) {
   let typos = 0;
   let tooLong = 0;
   if (agent3Ran) {
-    const failed = scripts.filter((s) => !s.ok);
-    if (failed.length) problems.push(`${failed.length} script(s) failed to generate`);
-    for (const s of scripts) {
-      if (!s.ok) continue;
-      const client = affectedClients.find((c) => c.clientId === s.clientId);
-      const tickers = client.matchedHoldings.map((h) => h.ticker);
-      if (!tickers.some((t) => s.script.includes(t))) generic++;
-      if (s.script.includes("สภาพคล็อง")) typos++; // typo guard must have fired
-      if (s.length_exceeded) tooLong++;
-    }
-    if (generic) problems.push(`${generic} generic script(s) (no matched ticker named)`);
-    if (typos) problems.push(`${typos} script(s) still contain the known typo`);
-    // The server flags scripts over MAX_SCRIPT_CHARS (never truncating them); a
-    // flagged script is not fit to freeze into the demo.
-    if (tooLong) problems.push(`${tooLong} script(s) exceed the character cap (length_exceeded)`);
+    const gates = scriptProblems(scripts, affectedClients);
+    problems.push(...gates.problems);
+    ({ generic, typos, tooLong } = gates);
   }
 
   console.log("  Verification:");
@@ -255,85 +258,86 @@ async function loadExistingCache() {
   }
 }
 
-// Optional CLI filter: `npm run regen:cache -- --only N007` (or the older bare
-// form `... -- N007`) regenerates ONLY that item and preserves every other
-// cached scenario verbatim — their serialized JSON is unchanged; only the file's
-// header comment (timestamp + summary) is rewritten. `--only` may repeat. Why
-// this exists: Agent output is NOT reproducible even at temperature 0
+// CLI:
+//   (no args)                     regenerate every cached scenario from scratch
+//   --only <newsId> (repeatable)  regenerate only that item (bare `<newsId>` works too);
+//                                 every other cached item's serialized JSON is left
+//                                 unchanged — only the file header (timestamp +
+//                                 summary) is rewritten
+//   --apply-cio-review <newsId>   apply src/data/cioReviews/<newsId>.json to the cached
+//                                 Agent 1 output and regenerate Agent 3 ONLY (see below)
+// Why --only exists: Agent output is NOT reproducible even at temperature 0
 // (measured — the same news re-run returns reworded text and a different
 // fact-check verdict), so a blanket regen silently replaces demo content that
-// was already reviewed. Pass no args to regenerate everything from scratch.
-function parseOnly(argv) {
-  const ids = [];
+// was already reviewed.
+function parseArgs(argv) {
+  const only = [];
+  let applyCio = null;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--only") {
       const id = argv[++i];
       if (!id || id.startsWith("-")) die("--only needs a news id, e.g. --only N007");
-      ids.push(id);
+      only.push(id);
     } else if (arg.startsWith("--only=")) {
-      ids.push(arg.slice("--only=".length));
+      only.push(arg.slice("--only=".length));
+    } else if (arg === "--apply-cio-review") {
+      const id = argv[++i];
+      if (!id || id.startsWith("-")) die("--apply-cio-review needs a news id, e.g. --apply-cio-review N007");
+      if (applyCio) die("--apply-cio-review can be given only once");
+      applyCio = id;
     } else if (arg.startsWith("-")) {
       die(`unknown option: ${arg}`);
     } else {
-      ids.push(arg);
+      only.push(arg);
     }
   }
-  return ids;
-}
-const only = parseOnly(process.argv.slice(2));
-const targets = only.length
-  ? CACHED_SCENARIOS.filter((s) => only.includes(s.id))
-  : CACHED_SCENARIOS;
-
-if (only.length) {
-  const unknown = only.filter((id) => !CACHED_SCENARIOS.some((s) => s.id === id));
-  if (unknown.length) die(`unknown scenario id(s): ${unknown.join(", ")}`);
+  if (applyCio && only.length) die("--apply-cio-review cannot be combined with --only / news ids");
+  return { only, applyCio };
 }
 
-console.log(
-  `Regenerating demo cache for: ${targets.map((s) => s.id).join(", ")}` +
-    (only.length ? `  (preserving all other cached scenarios)` : ""),
-);
-
-// Run every target BEFORE writing anything — all-or-nothing (see SAFETY above).
-const results = [];
-for (const scenario of targets) {
-  results.push({ scenario, ...(await runScenario(scenario)) });
-}
-
-const allProblems = results.flatMap(({ scenario, problems }) =>
-  problems.map((p) => `[${scenario.id}] ${p}`),
-);
-if (allProblems.length) {
-  for (const { entry, problems } of results) {
-    if (problems.length) console.error(`  failure artifact: ${writeFailureArtifact(entry, problems)}`);
+// scriptProblems — the Agent 3 gates, shared by a normal regen and a CIO-review
+// apply: every script generated, none generic, typo guard applied, none over the
+// character cap (the server flags, never truncates).
+function scriptProblems(scripts, affectedClients) {
+  const problems = [];
+  let generic = 0;
+  let typos = 0;
+  let tooLong = 0;
+  const failed = scripts.filter((s) => !s.ok);
+  if (failed.length) problems.push(`${failed.length} script(s) failed to generate`);
+  for (const s of scripts) {
+    if (!s.ok) continue;
+    const client = affectedClients.find((c) => c.clientId === s.clientId);
+    const tickers = client.matchedHoldings.map((h) => h.ticker);
+    if (!tickers.some((t) => s.script.includes(t))) generic++;
+    if (s.script.includes("สภาพคล็อง")) typos++; // typo guard must have fired
+    if (s.length_exceeded) tooLong++;
   }
-  die("verification failed:\n  - " + allProblems.join("\n  - "));
+  if (generic) problems.push(`${generic} generic script(s) (no matched ticker named)`);
+  if (typos) problems.push(`${typos} script(s) still contain the known typo`);
+  if (tooLong) problems.push(`${tooLong} script(s) exceed the character cap (length_exceeded)`);
+  return { problems, generic, typos, tooLong };
 }
 
-// --- Serialize to a committed, human-readable data module -----------------------
-// Keyed by news id so useDraft can look a scenario up directly. useDraft asserts
-// at boot that every key here still exists in mockNews.
-// Freshly generated entries overlay preserved ones; key order follows
-// CACHED_SCENARIOS so the committed file diffs cleanly run to run.
-const previous = await loadExistingCache();
-const preserved = only.length ? previous : {};
-const regenerated = Object.fromEntries(results.map(({ entry }) => [entry.newsId, entry]));
-
-// Review block per regenerated item, printed BEFORE the file is written so the
-// reviewer sees what the demo will show (acceptance criterion 2 above): the
-// dislocation verdict (the only record of it for items with no fixed
-// expectation), sector directions + reasons, normalization notes, the Agent 2
-// verdict, and the before/after ranking (a new item shows its new ranking).
-console.log("\nReview (check before committing the new cache):");
-for (const { scenario, entry } of results) {
-  const a = entry.analysis;
-  const isNew = !previous[entry.newsId];
-  console.log(`\n  ${entry.newsId}${isNew ? " (new item)" : ""}`);
+// printReview — the human review block (acceptance criterion 2), printed BEFORE
+// the cache is written. `analysis` is what matching/Agent 3 use (for a CIO
+// review, the edited analysis).
+function printReview({ scenario, entry, analysis, previousClients, cioReview }) {
+  const a = analysis;
+  console.log(`\n  ${entry.newsId}${previousClients ? "" : " (new item)"}`);
+  if (cioReview) {
+    console.log(`    CIO review              : ${cioReview.reviewer} @ ${cioReview.reviewedAt}`);
+    for (const c of cioReview.changes) {
+      console.log(`      ${c.path}`);
+      console.log(`        before    : ${c.before}`);
+      console.log(`        after     : ${c.after}`);
+      console.log(`        rationale : ${c.rationale}`);
+    }
+  }
   console.log(
     `    dislocation_detected    : ${!!a.dislocation_detected}` +
-      (scenario.expectDislocation === null ? "  (no fixed expectation — REVIEW)" : ""),
+      (scenario?.expectDislocation === null ? "  (no fixed expectation — REVIEW)" : ""),
   );
   console.log(`    dislocation_description : ${a.dislocation_description || "(none)"}`);
   console.log(`    event_scope             : ${a.event_scope ?? "(none)"}`);
@@ -344,31 +348,29 @@ for (const { scenario, entry } of results) {
   console.log(
     `    Agent 2                 : is_valid=${entry.agent2Result?.is_valid} ` +
       `issues=${JSON.stringify(entry.agent2Result?.flagged_issues ?? [])} ` +
-      `guard=${JSON.stringify(entry.agent2Result?.factcheck_normalization_notes ?? [])}`,
+      `guard=${JSON.stringify(entry.agent2Result?.factcheck_normalization_notes ?? [])}` +
+      (cioReview ? "  (fact check of the ORIGINAL AI analysis; not re-run)" : ""),
   );
   console.log(`    script lengths (cap ${MAX_SCRIPT_CHARS}) : ${scriptLengths(entry.scripts)}`);
-  const rows = rankingDiff(previous[entry.newsId]?.affectedClients, entry.affectedClients);
+  const rows = rankingDiff(previousClients, entry.affectedClients);
   console.log(formatRankingDiff(entry.newsId, rows));
 }
-const merged = { ...preserved, ...regenerated };
-const cache = Object.fromEntries(
-  CACHED_SCENARIOS.filter((s) => merged[s.id]).map((s) => [s.id, merged[s.id]]),
-);
 
-for (const id of Object.keys(cache)) {
-  const kept = !regenerated[id];
-  console.log(`  ${kept ? "preserved" : "regenerated"}: ${id}`);
-}
+// Serialize to a committed, human-readable data module. Keyed by news id so
+// useDraft can look a scenario up directly (it asserts at boot that every key
+// still exists in mockNews). Key order follows CACHED_SCENARIOS so the file
+// diffs cleanly run to run.
+function buildCacheFile(cache) {
+  const summary = Object.values(cache)
+    .map(
+      (entry) =>
+        `//   ${entry.newsId}: ${entry.affectedClients.length} clients, ` +
+        `${entry.scripts.length} scripts, dislocation=${!!entry.analysis.dislocation_detected}` +
+        (entry.cioReview ? `, CIO-reviewed (${entry.cioReview.changes.length} change(s))` : ""),
+    )
+    .join("\n");
 
-const summary = Object.values(cache)
-  .map(
-    (entry) =>
-      `//   ${entry.newsId}: ${entry.affectedClients.length} clients, ` +
-      `${entry.scripts.length} scripts, dislocation=${!!entry.analysis.dislocation_detected}`,
-  )
-  .join("\n");
-
-const file = `// cachedDemoRun.js — AUTO-GENERATED. DO NOT EDIT BY HAND.
+  return `// cachedDemoRun.js — AUTO-GENERATED. DO NOT EDIT BY HAND.
 //
 // Frozen output of the full pipeline (Agent 1 + matching/priority + Agent 2 +
 // per-client Agent 3 scripts) for each cached demo scenario, keyed by news id.
@@ -392,14 +394,180 @@ export const cachedDemoRuns = ${JSON.stringify(cache, null, 2)};
 
 export default cachedDemoRuns;
 `;
+}
 
-writeFileSync(CACHE_PATH, file, "utf8");
-// Count the whole COMMITTED cache, not just this run's regenerated entries —
-// a selective regen writes preserved scenarios back out too.
-const entries = Object.values(cache);
-const totalScripts = entries.reduce((n, e) => n + e.scripts.length, 0);
-console.log(
-  `\n✓ Wrote ${entries.length}-scenario cache (${entries.map((e) => e.newsId).join(", ")}; ` +
-    `${totalScripts} scripts total) → src/data/cachedDemoRun.js\n` +
-    `  Review the ranking diff above (and \`git diff src/data/cachedDemoRun.js\`) before committing.\n`,
-);
+function writeCache(merged) {
+  const cache = Object.fromEntries(
+    CACHED_SCENARIOS.filter((s) => merged[s.id]).map((s) => [s.id, merged[s.id]]),
+  );
+  writeFileSync(CACHE_PATH, buildCacheFile(cache), "utf8");
+  // Count the whole COMMITTED cache, not just this run's regenerated entries —
+  // a selective regen writes preserved scenarios back out too.
+  const entries = Object.values(cache);
+  const totalScripts = entries.reduce((n, e) => n + e.scripts.length, 0);
+  console.log(
+    `\n✓ Wrote ${entries.length}-scenario cache (${entries.map((e) => e.newsId).join(", ")}; ` +
+      `${totalScripts} scripts total) → src/data/cachedDemoRun.js\n` +
+      `  Review the output above (and \`git diff src/data/cachedDemoRun.js\`) before committing.\n`,
+  );
+}
+
+// --- Normal regeneration ------------------------------------------------------
+async function regenerate(only) {
+  const targets = only.length
+    ? CACHED_SCENARIOS.filter((s) => only.includes(s.id))
+    : CACHED_SCENARIOS;
+
+  if (only.length) {
+    const unknown = only.filter((id) => !CACHED_SCENARIOS.some((s) => s.id === id));
+    if (unknown.length) die(`unknown scenario id(s): ${unknown.join(", ")}`);
+  }
+
+  console.log(
+    `Regenerating demo cache for: ${targets.map((s) => s.id).join(", ")}` +
+      (only.length ? `  (preserving all other cached scenarios)` : ""),
+  );
+
+  // Run every target BEFORE writing anything — all-or-nothing (see SAFETY above).
+  const results = [];
+  for (const scenario of targets) {
+    results.push({ scenario, ...(await runScenario(scenario)) });
+  }
+
+  const allProblems = results.flatMap(({ scenario, problems }) =>
+    problems.map((p) => `[${scenario.id}] ${p}`),
+  );
+  if (allProblems.length) {
+    for (const { entry, problems } of results) {
+      if (problems.length) console.error(`  failure artifact: ${writeFailureArtifact(entry, problems)}`);
+    }
+    die("verification failed:\n  - " + allProblems.join("\n  - "));
+  }
+
+  const previous = await loadExistingCache();
+  const preserved = only.length ? previous : {};
+  const regenerated = Object.fromEntries(results.map(({ entry }) => [entry.newsId, entry]));
+
+  console.log("\nReview (check before committing the new cache):");
+  for (const { scenario, entry } of results) {
+    printReview({
+      scenario,
+      entry,
+      analysis: entry.analysis,
+      previousClients: previous[entry.newsId]?.affectedClients,
+    });
+  }
+
+  const merged = { ...preserved, ...regenerated };
+  for (const s of CACHED_SCENARIOS) {
+    if (merged[s.id]) console.log(`  ${regenerated[s.id] ? "regenerated" : "preserved"}: ${s.id}`);
+  }
+  writeCache(merged);
+}
+
+// --- CIO review apply ---------------------------------------------------------
+// Applies a committed, human-authored review file to the CACHED Agent 1 output
+// and regenerates Agent 3 only. It NEVER calls Agent 1 or Agent 2: the original
+// `analysis` and `agent2Result` stay in the cache byte-for-byte as the record of
+// what the AI produced; the edit lives in `cioReview` + `reviewedAnalysis`, and
+// `affectedClients` / `scripts` are recomputed from the reviewed analysis.
+// Same gates as a normal regen (fail-fast, length cap, failure artifact).
+async function applyCioReviewRun(newsId) {
+  const scenario = CACHED_SCENARIOS.find((s) => s.id === newsId);
+  if (!scenario) die(`unknown scenario id: ${newsId}`);
+  const previous = await loadExistingCache();
+  const cached = previous[newsId];
+  if (!cached) die(`${newsId} is not in the cache — run a normal regen first`);
+  if (cached.agent2Result?.is_valid !== true) {
+    die(`${newsId}: the cached Agent 2 verdict is not valid; a CIO review cannot rescue it`);
+  }
+
+  const reviewPath = join(CIO_REVIEW_DIR, `${newsId}.json`);
+  let review;
+  try {
+    review = JSON.parse(readFileSync(reviewPath, "utf8"));
+  } catch (err) {
+    die(`cannot read CIO review ${reviewPath}: ${err.message}`);
+  }
+
+  const blockers = reviewBlockers(review);
+  if (blockers.length) {
+    die(`CIO review for ${newsId} is not ready to apply:\n  - ${blockers.join("\n  - ")}`);
+  }
+  const { analysis: edited, errors } = applyCioReview(cached.analysis, review);
+  if (errors.length) die(`CIO review for ${newsId} rejected:\n  - ${errors.join("\n  - ")}`);
+
+  // Re-run the same deterministic normalization the endpoint applies, then match.
+  const summary = buildHoldingsSummary();
+  const reviewedAnalysis = normalizeAgent1Output(
+    edited,
+    heldSectorsFromSummary(summary),
+    heldTickersFromSummary(summary),
+  );
+  const affectedClients = findAffectedClients(reviewedAnalysis).sort(
+    (a, b) => b.priorityScore - a.priorityScore,
+  );
+  console.log(`Applying CIO review to ${newsId} (${review.changes.length} change(s)); Agent 1/2 are NOT called`);
+  console.log(`  matched clients: ${affectedClients.length}`);
+
+  // Scripts use the CIO's reasoning when the CIO changed it; otherwise the same
+  // choice as useDraft (Agent 2's adjusted reasoning, else Agent 1's).
+  const cioChangedReasoning = review.changes.some((c) => c.path === "reasoning");
+  const analysisForScripts = {
+    ...reviewedAnalysis,
+    reasoning: cioChangedReasoning
+      ? reviewedAnalysis.reasoning
+      : cached.agent2Result?.adjusted_reasoning || reviewedAnalysis.reasoning,
+  };
+
+  let scripts = [];
+  const problems = [];
+  if (affectedClients.length === 0) {
+    problems.push("no affected clients matched");
+  } else {
+    console.log(`→ Agent 3 (${affectedClients.length} client scripts)…`);
+    try {
+      scripts = await generateAllScripts(analysisForScripts, affectedClients);
+    } catch (err) {
+      problems.push(`pipeline error: ${err?.message ?? err}`);
+    }
+    problems.push(...scriptProblems(scripts, affectedClients).problems);
+  }
+
+  const cioReview = {
+    reviewer: review.reviewer,
+    reviewedAt: review.reviewedAt,
+    changes: review.changes.map(({ path, before, after, rationale }) => ({ path, before, after, rationale })),
+  };
+  const entry = {
+    ...cached, // newsId, generatedAt, analysis, agent2Result — unchanged
+    cioReview,
+    reviewedAnalysis,
+    affectedClients,
+    scripts,
+    scriptsGeneratedAt: new Date().toISOString(),
+  };
+
+  if (problems.length) {
+    const file = writeFailureArtifact({ ...entry, analysis: reviewedAnalysis }, problems);
+    console.error(`  failure artifact: ${file}`);
+    die(`CIO review apply failed for ${newsId}:\n  - ${problems.join("\n  - ")}`);
+  }
+
+  console.log("\nReview (check before committing the new cache):");
+  printReview({
+    scenario,
+    entry,
+    analysis: reviewedAnalysis,
+    previousClients: cached.affectedClients,
+    cioReview,
+  });
+  writeCache({ ...previous, [newsId]: entry });
+}
+
+const args = parseArgs(process.argv.slice(2));
+if (args.applyCio) {
+  await applyCioReviewRun(args.applyCio);
+} else {
+  await regenerate(args.only);
+}

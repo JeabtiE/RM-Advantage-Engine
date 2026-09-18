@@ -1,5 +1,6 @@
-// End-to-end test of `regenerateDemoCache.mjs --only <id>` against a STUBBED
-// endpoint. The real regen script runs in a child process, pointed at:
+// End-to-end tests of `regenerateDemoCache.mjs --only <id>` and
+// `--apply-cio-review <id>` against a STUBBED endpoint. The real regen script
+// runs in a child process, pointed at:
 //   - a local HTTP server that wraps the real api/claude-agent.js handler, whose
 //     Anthropic fetch is stubbed in THIS process (no network, no key), and
 //   - a temp copy of the cache (REGEN_CACHE_PATH), so the committed
@@ -12,7 +13,7 @@ import assert from "node:assert/strict";
 import http from "node:http";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { copyFileSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -29,12 +30,16 @@ let server;
 let base;
 let tmp;
 let anthropicCalls = 0;
+let agent1Calls = 0;
+let agent2Calls = 0;
 let agent3Calls = 0;
 // Per-test stub behaviour: "ok" | "a2-invalid" | "too-long".
 let mode = "ok";
 const resetStub = (m) => {
   mode = m;
   anthropicCalls = 0;
+  agent1Calls = 0;
+  agent2Calls = 0;
   agent3Calls = 0;
 };
 
@@ -49,6 +54,7 @@ function fakeAnthropic(init) {
   const { system, messages } = JSON.parse(init.body);
   const user = messages[0].content;
   if (system.includes("buy-side investment strategist")) {
+    agent1Calls++;
     return reply({
       affected_tickers: [],
       affected_sectors: ["banking", "property"],
@@ -64,6 +70,7 @@ function fakeAnthropic(init) {
     });
   }
   if (system.includes("fact checker")) {
+    agent2Calls++;
     return mode === "a2-invalid"
       ? reply({ is_valid: false, flagged_issues: ["stub issue"], adjusted_reasoning: "stub" })
       : reply({ is_valid: true, flagged_issues: [], adjusted_reasoning: "stub" });
@@ -223,4 +230,160 @@ test("--only with an unknown id or a missing value aborts without writing", asyn
     );
   }
   assert.equal(readFileSync(cache, "utf8"), before);
+});
+
+// --- --apply-cio-review ------------------------------------------------------------
+
+const committedCache = async () =>
+  (await import(`${pathToFileURL(REAL_CACHE).href}?t=${Date.now()}-${Math.random()}`)).cachedDemoRuns;
+
+// Runs `--apply-cio-review N007` with the given review object (or raw file
+// text) in a temp review dir against a temp copy of the committed cache.
+async function applyRun(label, review, extraArgs = []) {
+  const cache = join(tmp, `${label}.mjs`);
+  const reviewDir = join(tmp, `${label}-reviews`);
+  const failedDir = join(tmp, `${label}-failed`);
+  copyFileSync(REAL_CACHE, cache);
+  mkdirSync(reviewDir, { recursive: true });
+  writeFileSync(
+    join(reviewDir, "N007.json"),
+    typeof review === "string" ? review : JSON.stringify(review, null, 2),
+  );
+  const before = readFileSync(cache, "utf8");
+  let result;
+  try {
+    result = { code: 0, ...(await run(process.execPath, [SCRIPT, "--apply-cio-review", "N007", ...extraArgs], {
+      cwd: REPO,
+      env: {
+        ...process.env,
+        AGENT_ENDPOINT_BASE: base,
+        REGEN_CACHE_PATH: cache,
+        CIO_REVIEW_DIR: reviewDir,
+        REGEN_FAILED_DIR: failedDir,
+      },
+    })) };
+  } catch (err) {
+    result = { code: err.code, stdout: err.stdout, stderr: err.stderr };
+  }
+  return { ...result, cache, before, after: readFileSync(cache, "utf8"), failedDir };
+}
+
+const readyReview = async (changes) => {
+  const cached = (await committedCache()).N007.analysis;
+  return {
+    reviewer: "CIO (test)",
+    reviewedAt: "2026-09-18T03:00:00.000Z",
+    changes: changes(cached),
+  };
+};
+
+test("--apply-cio-review: applies edits, regenerates Agent 3 only, keeps the AI originals, prints the ranking diff", async () => {
+  resetStub("ok");
+  const review = await readyReview((a) => [
+    { path: "dislocation_description", before: a.dislocation_description, after: "ฉบับที่ CIO แก้ไข", rationale: "ตัดคำชี้นำ" },
+    {
+      path: "sector_impacts[technology].direction",
+      before: a.sector_impacts.find((s) => s.sector === "technology").direction,
+      after: "neutral",
+      rationale: "ทดสอบ",
+    },
+  ]);
+  const r = await applyRun("apply-ok", review);
+  assert.equal(r.code, 0, r.stderr);
+  assert.equal(agent1Calls, 0, "Agent 1 never called");
+  assert.equal(agent2Calls, 0, "Agent 2 never called");
+
+  const committed = await committedCache();
+  const written = (await import(`${pathToFileURL(r.cache).href}?t=${Date.now()}`)).cachedDemoRuns;
+  const n007 = written.N007;
+  // AI originals preserved exactly; other scenarios untouched.
+  assert.deepEqual(n007.analysis, committed.N007.analysis);
+  assert.deepEqual(n007.agent2Result, committed.N007.agent2Result);
+  assert.deepEqual(written.N006, committed.N006);
+  assert.deepEqual(written.N003, committed.N003);
+  // Review recorded; reviewed analysis re-normalized (neutral technology dropped).
+  assert.equal(n007.cioReview.reviewer, "CIO (test)");
+  assert.equal(n007.cioReview.changes.length, 2);
+  assert.equal(n007.reviewedAnalysis.dislocation_description, "ฉบับที่ CIO แก้ไข");
+  assert.ok(!n007.reviewedAnalysis.affected_sectors.includes("technology"));
+  assert.ok(n007.reviewedAnalysis.normalization_notes.some((x) => x.includes("technology")));
+  // Matching re-ran: KCE/HANA (sector matches) are gone; DELTA stays (ticker).
+  const tickers = n007.affectedClients.flatMap((c) => c.matchedHoldings.map((h) => h.ticker));
+  assert.ok(!tickers.includes("KCE") && !tickers.includes("HANA"));
+  assert.ok(tickers.includes("DELTA"));
+  assert.equal(agent3Calls, n007.affectedClients.length);
+  assert.equal(n007.scripts.length, n007.affectedClients.length);
+  // Review output.
+  assert.match(r.stdout, /Agent 1\/2 are NOT called/);
+  assert.match(r.stdout, /CIO review\s+: CIO \(test\)/);
+  assert.match(r.stdout, /Ranking diff N007/);
+  assert.match(r.stdout, /client\(s\) changed — REVIEW/);
+  assert.match(r.stdout, /fact check of the ORIGINAL AI analysis/);
+});
+
+for (const [label, makeChanges, expected] of [
+  [
+    "disallowed path",
+    (a) => [{ path: "affected_tickers", before: "x", after: "y", rationale: "r" }],
+    /not allowed/,
+  ],
+  [
+    "stale before",
+    (a) => [{ path: "reasoning", before: `${a.reasoning} (edited elsewhere)`, after: "ใหม่", rationale: "r" }],
+    /stale/,
+  ],
+  [
+    "open team decision",
+    (a) => [{
+      path: "sector_impacts[technology].direction",
+      before: "negative",
+      after: "TEAM DECISION NEEDED",
+      rationale: "r",
+    }],
+    /not ready to apply/,
+  ],
+]) {
+  test(`--apply-cio-review rejects a ${label}: exit 1, zero agent calls, cache untouched`, async () => {
+    resetStub("ok");
+    const review = await readyReview(makeChanges);
+    const r = await applyRun(`reject-${label.replace(/\W+/g, "-")}`, review);
+    assert.equal(r.code, 1);
+    assert.match(r.stderr, expected);
+    assert.equal(anthropicCalls, 0);
+    assert.equal(r.after, r.before);
+  });
+}
+
+test("--apply-cio-review refuses the committed DRAFT N007 review", async () => {
+  resetStub("ok");
+  const draftText = readFileSync(join(REPO, "src", "data", "cioReviews", "N007.json"), "utf8");
+  const r = await applyRun("draft", draftText);
+  assert.equal(r.code, 1);
+  assert.match(r.stderr, /reviewer is still a draft/);
+  assert.match(r.stderr, /TEAM DECISION NEEDED/);
+  assert.equal(anthropicCalls, 0);
+  assert.equal(r.after, r.before);
+});
+
+test("--apply-cio-review keeps the length gate: over-long scripts fail without writing", async () => {
+  resetStub("too-long");
+  const review = await readyReview((a) => [
+    { path: "reasoning", before: a.reasoning, after: "เหตุผลที่ CIO แก้ไข", rationale: "r" },
+  ]);
+  const r = await applyRun("apply-too-long", review);
+  assert.equal(r.code, 1);
+  assert.match(r.stderr, /exceed the character cap/);
+  assert.equal(agent1Calls + agent2Calls, 0);
+  assert.ok(agent3Calls > 0);
+  assert.equal(r.after, r.before);
+  assert.equal(readdirSync(r.failedDir).length, 1);
+});
+
+test("--apply-cio-review cannot be combined with --only", async () => {
+  resetStub("ok");
+  const review = await readyReview((a) => [{ path: "reasoning", before: a.reasoning, after: "x", rationale: "r" }]);
+  const r = await applyRun("combo", review, ["--only", "N006"]);
+  assert.equal(r.code, 1);
+  assert.match(r.stderr, /cannot be combined/);
+  assert.equal(anthropicCalls, 0);
 });
