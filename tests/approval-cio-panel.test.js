@@ -78,7 +78,10 @@ test("CIO panel lists each change with original AI text, edited text and rationa
   assert.ok(html.includes("แก้ไขโดย CIO"));
   assert.ok(html.includes("CIO ทดสอบ"));
   assert.ok(html.includes("คำอธิบาย Dislocation"));
-  assert.ok(html.includes("ต้นฉบับจาก AI"));
+  assert.ok(html.includes("ข้อความเดิมจาก AI"));
+  assert.ok(html.includes("ข้อความหลัง CIO แก้ไข"));
+  // Both versions must read as plain text — no strikethrough on the AI original.
+  assert.ok(!/line-through/.test(html));
   assert.ok(html.includes(original), "original AI text still visible");
   assert.ok(html.includes(edited));
   assert.ok(html.includes("ตัดคำชี้นำการลงทุน"));

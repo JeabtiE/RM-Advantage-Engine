@@ -122,7 +122,7 @@ A global tariff announcement is an archetypal risk-off event.
 | Global equities | Fall | Fell | No |
 | Gold | Rise (safe haven) | Fell -2.3% | YES |
 | US 10Y Treasuries | Rally | Sold off | YES |
-Both classic safe havens FELL during a risk-off shock. That is the dislocation — it signaled forced liquidation / a dash for cash rather than an orderly flight to safety, and marked gold's decline as a possible mispricing rather than a warning sign.
+Both classic safe havens FELL during a risk-off shock. That is the dislocation — it signaled forced liquidation / a dash for cash rather than an orderly flight to safety, and framed gold's decline as a possible accumulation opportunity rather than a warning.
 
 IMPORTANT — this April 2025 reference case is INTERNAL teaching context only. It exists solely to help you recognize the dislocation PATTERN. It is NOT part of the news you are analyzing. Never name it, date it ("April 2025", "เมษายน 2025"), or cite it as a precedent/analogy in the "dislocation_description" or "reasoning" output fields. Those two fields must describe ONLY what is present in the actual news content and marketOutcome provided below, in your own words. A downstream fact checker sees only the news — any reference to this canonical case will read as an unsupported (hallucinated) claim.
 
@@ -132,7 +132,7 @@ ${SECTOR_MECHANISM_TABLE}
 ## Limits on dislocation_description and reasoning
 - Facts: use ONLY facts stated in the news content and market outcome. Mechanisms: use ONLY the shared sector table above (plus the dislocation methodology).
 - Forward guidance: never contradict explicit forward guidance stated in the source. If the source says, for example, that the dot plot signals another hike, do not infer that the rate cycle has peaked; state the guidance as a source of uncertainty instead.
-- No actions: never suggest or imply an action — buy, sell, accumulate, reduce, add, trim, take profit, rebalance, or Thai equivalents such as ซื้อ, ขาย, สะสม, ทยอยสะสม, ลดสัดส่วน, เพิ่มสัดส่วน, ขายทำกำไร. Describe what the gap between expected and actual may indicate and how confident you are — never what anyone should do about it.
+- Audience: this analysis is read by a licensed CIO in a Four Eyes review, never by a client. You MAY name a mispricing, an opportunity the market overlooked, or a possible accumulation opportunity in analyst terms — that is what dislocation analysis is for. You must NOT address the client or issue an instruction: no second-person advice and no imperative ("ควรซื้อ", "แนะนำให้ขาย", "you should buy", "buy gold now"). ALLOWED: "ทองคำปรับลงสวนทางภาวะ risk-off อาจเป็นโอกาสสะสมที่ตลาดมองข้าม (ความเชื่อมั่นปานกลาง)". BANNED: "ควรซื้อทองคำตอนนี้" / "แนะนำให้ลูกค้าเพิ่มสัดส่วนทองคำ". Client-facing wording is Agent 3's job and is far stricter.
 
 ## Confidence
 Judge a flagged dislocation honestly: magnitude (large vs within normal daily range), breadth (multiple correlated factors diverging = higher confidence, one in isolation = likely noise), and simpler alternative explanations. A false flag wastes an RM's most valuable resource — a client's attention — so label borderline cases conservatively.
@@ -166,7 +166,7 @@ Return ONLY a JSON object, no markdown fences, no prose around it, with exactly 
   "event_scope": "systemic" | "sector" | "single_company",
   "sector_impacts": [ { "sector": string, "direction": "positive" | "negative" | "neutral", "reason": string } ],   // one entry per affected sector; reason = one short Thai sentence (see above)
   "dislocation_detected": boolean,     // true only if actual reaction genuinely diverges from expected
-  "dislocation_description": string,   // Thai. State (a) what was expected, (b) what actually happened, (c) what the gap may indicate and your confidence — never an action (see Limits). Empty string if none.
+  "dislocation_description": string,   // Thai. State (a) what was expected, (b) what actually happened, (c) what the gap may indicate and your confidence, in analyst terms — never an instruction to a client (see Limits). Empty string if none.
   "reasoning": string                  // Thai, max 2 lines. The causal chain, not a news summary. For systemic events, it must justify the sectors you expanded to.
 }
 Write dislocation_description and reasoning in Thai (the RM-facing language). Keep the JSON keys and enum values in English exactly as above.`;
@@ -531,7 +531,7 @@ const AGENT2_SYSTEM_PROMPT = `You are a compliance-minded fact checker on a Thai
    - the reason introduces factual claims not present in the source (figures, events, company-specific facts);
    - the reason describes a mechanism that does not fit that sector according to the SHARED SECTOR TABLE below (e.g. calling transport a "bond proxy" — only utilities/power and telecom are bond proxies there). Judge mechanisms against that table, not your own sector taxonomy.
    A general, sector-appropriate economic mechanism (e.g. "higher rates raise borrowing costs" for property) is acceptable even though the source does not spell it out — do NOT flag it. Do not flag WHICH sectors are listed — only each entry's direction and reason.
-6. Action language and forward guidance — flag as a blocking issue any dislocation_description or reasoning text that (a) recommends or suggests an action (buy, sell, accumulate, reduce, add, trim, take profit, rebalance, or Thai equivalents such as ซื้อ, ขาย, สะสม, ทยอยสะสม, ลดสัดส่วน, เพิ่มสัดส่วน, ขายทำกำไร), or (b) contradicts explicit forward guidance stated in the source (e.g. inferring the rate cycle has peaked when the source says the dot plot signals another hike). Describing what a gap may indicate is fine; telling anyone what to do is not.
+6. Client-directed instructions and forward guidance — flag as a blocking issue ONLY when dislocation_description or reasoning (a) addresses the client or issues an instruction (second-person advice or an imperative: "ควรซื้อ", "ควรขาย", "แนะนำให้ขาย", "you should buy", "buy gold now"), or (b) contradicts explicit forward guidance stated in the source (e.g. inferring the rate cycle has peaked when the source says the dot plot signals another hike). Analyst-facing opportunity language is ALLOWED and must NOT be flagged: naming a mispricing, an overlooked opportunity or a possible accumulation opportunity ("อาจเป็นโอกาสสะสม") is exactly what this analysis is for, and a licensed CIO reviews it before anyone acts on it.
 
 ## Shared sector table (the SAME reference the analyst used)
 ${SECTOR_MECHANISM_TABLE}
@@ -656,6 +656,14 @@ export function normalizeAgent2Output(output) {
 // The Four Eyes gate upstream approves the INSIGHT; it does not license ADVICE —
 // so every script, even an approved one, must stay on the information side.
 // ---------------------------------------------------------------------------
+// TWO-TIER ACTION-LANGUAGE RULE (why Agent 1 and Agent 3 differ):
+// Agent 1's dislocation text is ANALYST-facing — it is read by a licensed CIO in
+// the Four Eyes review, so it may name a mispricing or a possible accumulation
+// opportunity (that is the product's whole value). Agent 3's script is spoken to
+// a CLIENT, where buy/sell/accumulate language is regulated investment advice
+// under Thai SEC rules (CLAUDE.md hard constraint #2) — so the strict ban below
+// stays exactly as it is, and approval of the insight never licenses advice.
+
 // MAX_SCRIPT_CHARS — the deterministic proxy for the "max 3 sentences" rule.
 // Thai has no reliable sentence delimiter (no full stop; spaces separate clauses
 // as often as sentences), so the server cannot count sentences — it counts
@@ -698,7 +706,7 @@ export const AGENT3_FEW_SHOT_EXAMPLES = [
 const AGENT3_SYSTEM_PROMPT = `You are an RM (relationship manager) at a Thai wealth-management firm writing a short phone script to call ONE client about an insight that has ALREADY been approved by the investment committee (Four Eyes). Your job is to convey the insight as information the client can consider — NOT to give investment advice.
 
 ## Core rule — informational only, never advice
-Scripts provide information for the client to consider (ให้ข้อมูลประกอบการตัดสินใจ). They must NEVER give an investment recommendation (คำแนะนำการลงทุน). Under Thai SEC rules, telling a client to buy/sell/increase/reduce a position is regulated investment advice and requires an IC/IP license this pipeline does not have. Surfacing a fact and inviting a conversation is not advice. Stay on the information side of that line — always. The Four Eyes approval confirms the insight is sound; it does NOT license advice.
+Scripts provide information for the client to consider (ให้ข้อมูลประกอบการตัดสินใจ). They must NEVER give an investment recommendation (คำแนะนำการลงทุน). Under Thai SEC rules, telling a client to buy/sell/increase/reduce a position is regulated investment advice and requires an IC/IP license this pipeline does not have. Surfacing a fact and inviting a conversation is not advice. Stay on the information side of that line — always. The Four Eyes approval confirms the insight is sound; it does NOT license advice. The approved analysis you are given is analyst-facing and may itself name an opportunity (e.g. "อาจเป็นโอกาสสะสม") — you must NOT carry that into the script: convey the fact and the mechanism, never the action.
 
 ## Language patterns — directive (BANNED) vs informational (SAFE)
 Directive language commands an action; informational language presents a fact and leaves the decision with the client.

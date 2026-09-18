@@ -500,11 +500,12 @@ function CioReviewPanel({ review, changes }) {
         {changes.map((c) => (
           <li key={c.path} className="rounded-xl bg-slate-50 p-3 text-xs">
             <p className="font-semibold text-slate-700">{cioPathLabel(c.path)}</p>
-            <p className="mt-1.5 text-[11px] font-medium text-slate-400">ต้นฉบับจาก AI</p>
-            <p className="leading-relaxed text-slate-500 line-through decoration-slate-300">
-              {c.before}
-            </p>
-            <p className="mt-1.5 text-[11px] font-medium text-emerald-600">ฉบับแก้ไข</p>
+            {/* Both versions stay plain and fully readable — no strikethrough:
+                the CIO is reviewing wording, and struck-through Thai is hard to
+                read on a screen the presenter is talking over. */}
+            <p className="mt-1.5 text-[11px] font-medium text-slate-400">ข้อความเดิมจาก AI</p>
+            <p className="leading-relaxed text-slate-500">{c.before}</p>
+            <p className="mt-1.5 text-[11px] font-medium text-emerald-600">ข้อความหลัง CIO แก้ไข</p>
             <p className="leading-relaxed text-slate-800">{c.after}</p>
             <p className="mt-1.5 text-[11px] font-medium text-slate-400">เหตุผลของ CIO</p>
             <p className="leading-relaxed text-slate-600">{c.rationale}</p>

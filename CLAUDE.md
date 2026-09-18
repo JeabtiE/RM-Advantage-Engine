@@ -152,7 +152,7 @@ Output:
   "event_scope": "systemic|sector|single_company",
   "sector_impacts": [{ "sector": "banking", "direction": "positive|negative|neutral", "reason": "one short Thai sentence" }],
   "dislocation_detected": true,
-  "dislocation_description": "ทองลง 2.3% ทั้งที่ควรขึ้นในภาวะ risk-off — อาจสะท้อนการประเมินราคาที่คลาดเคลื่อน (ความเชื่อมั่นปานกลาง)",
+  "dislocation_description": "ทองลง 2.3% ทั้งที่ควรขึ้นในภาวะ risk-off — อาจเป็นโอกาสสะสม (ความเชื่อมั่นปานกลาง)",
   "reasoning": "max 2 lines"
 }
 ```
@@ -185,11 +185,18 @@ Output:
 - **Limits on `dislocation_description` / `reasoning`** — facts only from the news
   content and marketOutcome; mechanisms only from the shared sector table; never
   contradict explicit forward guidance in the source (e.g. a dot plot signalling
-  another hike rules out "the rate cycle has peaked"); never suggest an action
-  (buy / sell / accumulate / reduce / add / trim / take profit / rebalance, or
-  ซื้อ / ขาย / สะสม / ทยอยสะสม / ลดสัดส่วน / เพิ่มสัดส่วน / ขายทำกำไร). Describe what the
-  gap may indicate and the confidence — never what to do. (The prompt's canonical
-  reference case now says "possible mispricing", not "accumulation opportunity".)
+  another hike rules out "the rate cycle has peaked").
+- **Two-tier action language (Agent 1 vs Agent 3)** — Agent 1's output is
+  ANALYST-facing: a licensed CIO reads it at the Four Eyes gate, so it MAY name a
+  mispricing, an overlooked opportunity or a possible accumulation opportunity
+  ("อาจเป็นโอกาสสะสม") — that is what dislocation analysis is for, and the N006
+  money shot depends on it. It may NOT address the client or issue an instruction
+  (second-person advice or imperative: "ควรซื้อ", "แนะนำให้ขาย", "you should buy").
+  Agent 3's script is CLIENT-facing and keeps the strict ban: no
+  buy/sell/accumulate language at all (hard constraint #2 — Thai SEC investment
+  advice). Approval of the insight never licenses advice. A blanket ban on Agent 1
+  was tried in Phase 4.1 and reverted in 4.2: it would have failed N006, whose own
+  source text names an accumulation opportunity.
 - **Ticker discipline** — for `systemic` / `sector` events, `affected_tickers`
   holds only companies named in the news or with company-specific exposure stated
   in the reasoning; sector-wide exposure goes in `affected_sectors` /
@@ -247,9 +254,10 @@ dislocation-analysis skill §6).
 - **Source-only verification:** judge claims only against the provided news
   content and marketOutcome; never flag a name, date, figure or event as wrong
   from background knowledge, which may be outdated.
-- **Check 6 (blocking):** `dislocation_description` or `reasoning` that recommends
-  or suggests an action (same word list as Agent 1's limits), or that contradicts
-  explicit forward guidance stated in the source.
+- **Check 6 (blocking):** `dislocation_description` or `reasoning` that addresses
+  the client or issues an instruction (second-person advice / imperative), or that
+  contradicts explicit forward guidance stated in the source. Analyst-facing
+  opportunity language is explicitly NOT flagged (see two-tier rule above).
 - `flagged_issues` lists only approval-blocking problems; observations the model
   concludes are acceptable are not listed.
 
@@ -410,6 +418,13 @@ regenerated — so the AI's original output stays on record.
   AI's record; Agent 2's verdict refers to the ORIGINAL analysis), plus
   `cioReview`, `reviewedAnalysis` (what matching and Agent 3 used),
   recomputed `affectedClients` / `scripts`, and `scriptsGeneratedAt`.
+- **Agent 2's verdict covers the ORIGINAL AI output only.** A CIO edit is
+  deliberately NOT re-checked by a machine: the human gate is the authority, and
+  re-running Agent 2 on a CIO's own wording would either rubber-stamp it or
+  invite an LLM to overrule a licensed reviewer. The cache keeps
+  `agent2Result` next to the untouched `analysis`, and the UI labels it as the
+  original's verdict so nobody reads it as approval of the edit. The deterministic
+  checks (allowed paths, stale `before`, normalization, script gates) still run.
 - **UI:** useDraft uses `reviewedAnalysis` and passes `aiAnalysis` + `cioReview`;
   ApprovalDashboard shows a "แก้ไขโดย CIO" panel with each change's original AI
   text, edited text and rationale, marks the hero text as CIO-edited, and labels
@@ -434,12 +449,6 @@ How the script behaves:
 - **Failure artifacts:** on any failure the cache is not written; the run's Agent
   1 output, Agent 2 output, ranked clients and scripts generated so far go to
   `.regen-failed/<newsId>-<timestamp>.json` (gitignored) for review.
-- **Known conflict — N006 and the no-action rule:** the N006 source itself
-  (`mockNews.js` marketOutcome: "…อาจเป็นโอกาสสะสมทองคำที่ตลาดมองข้าม") and its
-  cached dislocation_description use accumulation language. The cache is
-  untouched, but a future N006 regen will likely fail Agent 2 check 6 (or Agent 1
-  will have to drop wording the source uses) until the team decides whether to
-  reword that source text or record a CIO review for N006.
 - **Exit:** the script aborts by throwing, not `process.exit()`, because on
   Windows exiting while fetch keep-alive sockets close trips a libuv assertion
   (exit 0xC0000409 instead of 1).
