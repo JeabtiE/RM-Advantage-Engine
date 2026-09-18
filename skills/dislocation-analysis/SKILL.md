@@ -69,19 +69,25 @@ the same table format.
 Use these to build the Step 1 expectation when Thai (SET) holdings are involved.
 State the direction of the driver *and* the direction of the sector response.
 
-| Sector | Primary macro factor | Relationship |
-|---|---|---|
-| Banking (KBANK, SCB, BBL) | Interest rates | **Positive** — higher rates widen net interest margins |
-| Energy / Oil & Gas (PTT, PTTEP) | Crude oil price | **Positive** — revenue tracks oil prices |
-| Property / Real estate (LH, AP, SPALI) | Interest rates | **Inverse** — rate hikes raise mortgage costs, cool demand |
-| Utilities / Power (GULF, GPSC) | Interest rates | **Inverse** — capital-heavy, bond-proxy; hurt by rising rates |
-| Tourism / Airlines / Hotels (AOT, MINT, CENTEL) | Baht FX, oil, travel demand | Weaker baht + lower oil = **positive**; strong baht/high oil = negative |
-| Exporters (electronics, food) | Baht FX | **Inverse to baht strength** — weaker baht boosts export revenue |
-| Retail / Consumer (CPALL, CRC, HMPRO) | Domestic consumption, rates | **Positive** to spending; **inverse** to rate hikes on financing |
-| Healthcare (BDMS, BH) | Defensive | Low macro sensitivity — outperforms in risk-off |
+This is the SAME text the Agent 1 and Agent 2 prompts use — it is the
+`SECTOR_MECHANISM_TABLE` constant in `api/claude-agent.js`, injected verbatim
+into both prompts so the analyst and the fact checker share one definition of
+each sector (e.g. which sectors are bond proxies). Edit the constant and this
+block together; `tests/claude-agent.test.js` fails if they drift.
 
-General rate rule of thumb: **rate hikes** help banks, hurt property / utilities
-/ rate-sensitive growth; **rate cuts** do the reverse.
+```text
+- Banking (KBANK, SCB, BBL): interest rates — POSITIVE (higher rates widen net interest margins).
+- Energy / Oil & Gas (PTT, PTTEP): crude oil price — POSITIVE (revenue tracks oil).
+- Property (LH, AP, SPALI, CPN): interest rates — INVERSE (rate hikes raise mortgage costs).
+- Utilities / Power (GULF, GPSC): interest rates — INVERSE (bond proxy: capital-heavy, stable cash flows).
+- Telecom (ADVANC, TRUE, INTUCH): interest rates — INVERSE (bond proxy: stable cash flows, high dividends, high leverage).
+- Tourism / Airports (AOT, MINT, CENTEL): baht FX, oil, travel demand — weaker baht + lower oil = POSITIVE.
+- Exporters / Electronics (DELTA, KCE): baht FX — INVERSE to baht strength (weaker baht boosts export revenue).
+- Retail / Consumer (CPALL, CRC, HMPRO): domestic consumption — POSITIVE to spending, INVERSE to rate hikes.
+- Healthcare (BDMS, BH): defensive — low macro sensitivity, outperforms in risk-off.
+Bond proxies are ONLY the sectors labelled "bond proxy" above (utilities/power and telecom). Transport and property are rate-sensitive for other reasons (debt-funded infrastructure, mortgage costs) and are not bond proxies.
+Rate rule of thumb: rate hikes help banks, hurt property / utilities / telecom / rate-sensitive growth; rate cuts do the reverse.
+```
 
 ## 5. Output Guidance
 
@@ -105,6 +111,22 @@ being within normal market noise. Consider:
 - **Alternative explanations** — is there a simpler cause (unrelated news, a
   data artifact, a known technical flow) that explains the move without a true
   dislocation?
+
+**Limits (enforced in the Agent 1 prompt and checked by Agent 2, check 6).**
+The description and reasoning use only facts from the news content and market
+outcome, plus mechanisms from the §4 table, and never contradict explicit forward
+guidance in the source (e.g. if the dot plot signals another hike, do not infer the
+rate cycle has peaked).
+
+**Two-tier action language.** This analysis is ANALYST-facing — a licensed CIO
+reads it in the Four Eyes review — so it MAY name a mispricing, an overlooked
+opportunity or a possible accumulation opportunity (the canonical gold case
+above does exactly that). What it may not do is address the client or issue an
+instruction: no second-person advice, no imperative ("ควรซื้อ", "แนะนำให้ขาย",
+"you should buy"). The CLIENT-facing script (Agent 3, rm-script-writing skill) is
+far stricter: no buy/sell/accumulate language at all, because that is regulated
+investment advice under Thai SEC rules. Approval of the insight never licenses
+advice.
 
 Frame the confidence honestly. A flagged dislocation that turns out to be noise
 wastes an RM's most valuable resource — a client's attention — so it is better
@@ -136,7 +158,7 @@ canonical Tariff case. Agent 2's scope is deliberately narrowed to the claims it
 | Claim | Who owns it | In fact-check scope? |
 |---|---|---|
 | `dislocation_detected` + `dislocation_description` | Agent 1 narrative | **Yes** — verify against market outcome |
-| `sentiment` direction | Agent 1 narrative | **Yes** — verify against news |
+| `sentiment` (expected, pre-reaction net impact) | Agent 1 narrative | **Yes** — only for inconsistency with the `sector_impacts` directions; never for diverging from the actual market reaction when a dislocation is described (that gap IS the dislocation) |
 | `reasoning` grounding (numbers, price moves, named precedents) | Agent 1 narrative | **Yes** — flag invented facts / dated reference cases |
 | `event_scope` | Agent 1 classification | **Yes** — is it consistent with the news text? (§7) |
 | `sector_impacts[].direction` + `reason` (non-neutral entries) | Agent 1 narrative | **Yes** — blocking if the reason is missing, contradicts the source, adds facts not in the source, or uses a mechanism that does not fit the sector |

@@ -80,7 +80,7 @@ bank stock swept up in a market-wide risk-off selloff, not a directly tariffed e
 That is **still** a nameable, explainable connection. Name the ticker and state the
 indirect mechanism honestly:
 
-> "หุ้น AOT ของคุณได้รับแรงกดดันจากการเทขายทั้งตลาดในภาวะ risk-off แม้จะไม่ได้ถูกกระทบจากภาษีโดยตรง"
+> "หุ้น AOT ของคุณอาจได้รับแรงกดดันจากการเทขายทั้งตลาดในภาวะ risk-off แม้จะไม่ได้ถูกกระทบจากภาษีโดยตรง"
 
 Indirect and honest beats generic every time. There is always a specific holding to name —
 name it. Never retreat to "may be relevant to your portfolio" because the link is second-order.
@@ -95,7 +95,7 @@ demo runs predate the field and omit it.
   beneficiary, or vice versa.
 - When a client holds **both** positive and negative holdings, mention both sides briefly,
   within the same sentence limit:
-  > "หุ้น KBANK ในพอร์ตได้แรงหนุนจากดอกเบี้ยที่สูงขึ้น ขณะที่ LH อาจถูกกดดันจากต้นทุนสินเชื่อ"
+  > "หุ้น KBANK ในพอร์ตมีแนวโน้มได้แรงหนุนจากดอกเบี้ยที่สูงขึ้น ขณะที่ LH อาจถูกกดดันจากต้นทุนสินเชื่อ"
 - Presenting both sides is information, not a rebalancing suggestion — never tell the client
   to shift from one to the other.
 
@@ -135,26 +135,30 @@ invited — not instructed — to talk further.
 
 ## 6. Few-Shot Example Scripts — Tariff/Gold Dislocation Case
 
-Scenario: Trump announces global import tariffs. Theory says gold should rise as a
-safe haven in a risk-off move, but gold actually **fell 2.3%** alongside equities and
-US treasuries — an unusual dislocation. Use these as few-shot examples in prompts.
+Scenario: Trump announces global import tariffs. **Reported:** global equities fell in a
+risk-off move with broad selling, gold **fell 2.3%** and US treasuries sold off —
+although theory says gold should rise as a safe haven. **No individual stock's move is
+reported.**
 
-Note how each example **names the client's own holding and its mechanism** (§3) before
-delivering the dislocation — the ticker is bolded here for emphasis only.
+These are the exact scripts in the Agent 3 prompt (`AGENT3_FEW_SHOT_EXAMPLES` in
+`api/claude-agent.js`; a test keeps this section in sync). Each follows the
+facts-vs-mechanisms rule: the reported figure (gold −2.3%) is stated plainly, while the
+effect on the client's own stock is a mechanism and is hedged (มีแนวโน้ม / อาจ).
 
 ### conservative (holds DELTA — direct exporter link)
-> "เรียนคุณสมชายครับ ข่าวการขึ้นภาษีนำเข้าของสหรัฐกดดันหุ้นกลุ่มส่งออกโดยตรง รวมถึง **DELTA** ที่คุณสมชายถืออยู่ เพราะกำแพงภาษีเพิ่มต้นทุนการค้าและกระทบคำสั่งซื้อจากต่างประเทศ ที่ผิดปกติคือทองคำซึ่งควรเป็นสินทรัพย์ปลอดภัยกลับปรับลง 2.3% สวนทางกับที่ควรจะเป็น ซึ่งยังมีความไม่แน่นอนอยู่ หากคุณสมชายสนใจ ผมขอเรียนให้ทราบไว้เป็นข้อมูลและนัดคุยรายละเอียดเพิ่มเติมได้ครับ"
+> "เรียนคุณสมชายครับ สหรัฐประกาศขึ้นภาษีนำเข้าทั่วโลกและตลาดหุ้นทั่วโลกปรับตัวลง ซึ่งอาจกดดันหุ้นส่งออกอย่าง DELTA ที่คุณสมชายถืออยู่ เพราะกำแพงภาษีมีแนวโน้มเพิ่มต้นทุนการค้าและกระทบคำสั่งซื้อจากต่างประเทศ ที่ผิดปกติคือทองคำซึ่งควรเป็นสินทรัพย์ปลอดภัยกลับปรับลง 2.3% ซึ่งยังมีความไม่แน่นอนอยู่ หากคุณสมชายสนใจ ผมขอเรียนให้ทราบไว้เป็นข้อมูลและนัดคุยรายละเอียดเพิ่มเติมได้ครับ"
 
 ### moderate (holds KCE — direct exporter link)
-> "เรียนคุณวิภาครับ ข่าวการขึ้นภาษีนำเข้าของสหรัฐกระทบหุ้นส่งออกอย่าง **KCE** ที่คุณวิภาถืออยู่ เพราะรายได้หลักมาจากการส่งออกชิ้นส่วนที่ต้องเผชิญกำแพงภาษีสูงขึ้น จุดที่น่าสนใจคือทองคำกลับปรับลง 2.3% พร้อมตลาดหุ้น ทั้งที่ตามทฤษฎีควรเป็นสินทรัพย์ปลอดภัยที่ปรับขึ้น ซึ่งเป็นภาพที่ไม่ค่อยเกิดขึ้น หากคุณวิภาสนใจ เราพูดคุยรายละเอียดเพิ่มเติมกันได้ครับ"
+> "เรียนคุณวิภาครับ สหรัฐประกาศขึ้นภาษีนำเข้า ซึ่งมีแนวโน้มกระทบหุ้นส่งออกอย่าง KCE ที่คุณวิภาถืออยู่ เพราะรายได้หลักมาจากการส่งออกชิ้นส่วนที่อาจเผชิญกำแพงภาษีสูงขึ้น จุดที่น่าสนใจคือทองคำปรับลง 2.3% พร้อมตลาดหุ้น ทั้งที่ตามทฤษฎีควรเป็นสินทรัพย์ปลอดภัยที่ปรับขึ้น ซึ่งเป็นภาพที่ไม่ค่อยเกิดขึ้น หากคุณวิภาสนใจ เราพูดคุยรายละเอียดเพิ่มเติมกันได้ครับ"
 
 ### aggressive (holds DELTA — direct exporter link)
-> "เรียนคุณธนากรครับ ข่าวภาษีนำเข้าสหรัฐกระแทกหุ้นส่งออกอย่าง **DELTA** ในพอร์ตของคุณธนากรโดยตรง เพราะเป็นกลุ่มที่พึ่งพารายได้จากการค้าระหว่างประเทศมากที่สุด แต่จุดที่ตลาดส่วนใหญ่มองข้ามคือทองคำปรับลง 2.3% ทั้งที่ในภาวะ risk-off ควรปรับขึ้น อาจสะท้อนแรงขายเพื่อเพิ่มสภาพคล่องมากกว่าการเปลี่ยนพื้นฐาน ผมมองว่าเป็นข้อมูลที่คุณธนากรน่าจะสนใจ หากอยากลงลึกโทรคุยกันได้เลยครับ"
+> "เรียนคุณธนากรครับ สหรัฐประกาศขึ้นภาษีนำเข้าทั่วโลก ซึ่งมีแนวโน้มกดดันหุ้นส่งออกอย่าง DELTA ในพอร์ตของคุณธนากรมากเป็นพิเศษ เพราะพึ่งพารายได้จากการค้าระหว่างประเทศสูง แต่จุดที่ตลาดส่วนใหญ่มองข้ามคือทองคำปรับลง 2.3% ทั้งที่ในภาวะ risk-off ควรปรับขึ้น ซึ่งอาจสะท้อนแรงขายเพื่อเพิ่มสภาพคล่องมากกว่าการเปลี่ยนแปลงพื้นฐาน ผมมองว่าเป็นข้อมูลที่คุณธนากรน่าจะสนใจ หากอยากลงลึกโทรคุยกันได้เลยครับ"
 
 ### moderate, indirect link (holds AOT — swept up in risk-off, not directly tariffed)
-> "เรียนคุณศิริพรครับ ข่าวขึ้นภาษีนำเข้าสหรัฐทำให้ตลาดเข้าสู่ภาวะ risk-off และหุ้น **AOT** ที่คุณศิริพรถืออยู่ได้รับแรงกดดันจากการเทขายทั้งตลาด แม้จะไม่ได้ถูกกระทบจากภาษีโดยตรง จุดที่น่าสนใจคือทองคำกลับปรับลง 2.3% ทั้งที่ควรเป็นสินทรัพย์ปลอดภัย ซึ่งอาจสะท้อนแรงขายเพื่อเพิ่มสภาพคล่อง หากคุณศิริพรสนใจ เราพูดคุยรายละเอียดเพิ่มเติมกันได้ครับ"
+> "เรียนคุณศิริพรครับ ข่าวขึ้นภาษีนำเข้าสหรัฐทำให้ตลาดเข้าสู่ภาวะ risk-off และมีแรงเทขายทั่วตลาด ซึ่งอาจกดดันหุ้น AOT ที่คุณศิริพรถืออยู่ด้วย แม้จะไม่ได้ถูกกระทบจากภาษีโดยตรง จุดที่น่าสนใจคือทองคำกลับปรับลง 2.3% ทั้งที่ควรเป็นสินทรัพย์ปลอดภัย ซึ่งอาจสะท้อนแรงขายเพื่อเพิ่มสภาพคล่อง หากคุณศิริพรสนใจ เราพูดคุยรายละเอียดเพิ่มเติมกันได้ครับ"
 
 Note across all four: each **names a specific holding and its mechanism** (including the
-indirect AOT case), same dislocation fact (gold fell 2.3% against expectation), tone
-escalates from cautious to direct, but **none** say buy/sell or "ควร…". Each ends with an
-invitation to talk, not an instruction to act.
+indirect AOT case), hedges that mechanism, states the same reported dislocation fact
+(gold fell 2.3% against expectation), tone escalates from cautious to direct, **none**
+say buy/sell or "ควร…", and each stays well under the 600-character cap. Each ends with
+an invitation to talk, not an instruction to act.

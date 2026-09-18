@@ -9,7 +9,13 @@
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 
-import handler from "../api/claude-agent.js";
+import { readFileSync } from "node:fs";
+
+import handler, {
+  SECTOR_MECHANISM_TABLE,
+  MAX_SCRIPT_CHARS,
+  AGENT3_FEW_SHOT_EXAMPLES,
+} from "../api/claude-agent.js";
 import { mockNews } from "../src/data/mockNews.js";
 import { cachedDemoRuns } from "../src/data/cachedDemoRun.js";
 import { buildHoldingsSummary } from "../src/utils/matching.js";
@@ -347,6 +353,189 @@ test("temperature sent to Anthropic is 0 for Agent 1 and Agent 2 (and unchanged 
     assert.equal(out.status, 200, body.agent);
     assert.equal(JSON.parse(fetchCalls[0].init.body).temperature, 0, body.agent);
   }
+});
+
+// System prompt sent for one agent call (via the stubbed fetch).
+async function systemPromptFor(body) {
+  fetchCalls = [];
+  const out = await call({ body });
+  assert.equal(out.status, 200, body.agent);
+  return JSON.parse(fetchCalls[0].init.body).system;
+}
+
+test("Agent 1 and Agent 2 prompts carry the SAME shared sector table; the skill doc matches it", async () => {
+  const a1 = await systemPromptFor(impactBody());
+  const a2 = await systemPromptFor({ agent: "factcheck", news: n006, agent1Output: n006Run.analysis });
+  assert.ok(a1.includes(SECTOR_MECHANISM_TABLE), "Agent 1 prompt");
+  assert.ok(a2.includes(SECTOR_MECHANISM_TABLE), "Agent 2 prompt");
+  const skill = readFileSync(new URL("../skills/dislocation-analysis/SKILL.md", import.meta.url), "utf8")
+    .replace(/\r\n/g, "\n");
+  assert.ok(skill.includes("```text\n" + SECTOR_MECHANISM_TABLE + "\n```"), "skill doc §4 in sync");
+  assert.match(SECTOR_MECHANISM_TABLE, /Utilities \/ Power .*bond proxy/);
+  assert.match(SECTOR_MECHANISM_TABLE, /Telecom .*bond proxy/);
+});
+
+test("Agent 2 check 5 uses transport as the wrong-bond-proxy example and defers to the shared table", async () => {
+  const a2 = await systemPromptFor({ agent: "factcheck", news: n006, agent1Output: n006Run.analysis });
+  assert.match(a2, /calling transport a "bond proxy"/);
+  assert.match(a2, /Judge mechanisms against that table, not your own sector taxonomy/);
+  assert.ok(!a2.includes("such as utilities/power"), "old misleading example removed");
+});
+
+test("sentiment is defined as the expected pre-reaction impact in both prompts", async () => {
+  const a1 = await systemPromptFor(impactBody());
+  const a2 = await systemPromptFor({ agent: "factcheck", news: n006, agent1Output: n006Run.analysis });
+  assert.match(a1, /"sentiment" is the EXPECTED \(theoretical\) net impact/);
+  assert.match(a1, /belongs ONLY in dislocation_detected \/ dislocation_description/);
+  assert.match(a2, /Flag it ONLY if it is inconsistent with the sector_impacts directions/);
+  assert.match(a2, /NEVER flag sentiment for diverging from the actual market reaction when a dislocation is described/);
+});
+
+// Client-directed instructions — the ONLY action language Agent 1/2 must reject.
+// Analyst-facing opportunity wording ("อาจเป็นโอกาสสะสม") is allowed by design.
+const CLIENT_DIRECTED = [
+  "ควรซื้อ",
+  "ควรขาย",
+  "ควรถือ",
+  "แนะนำให้",
+  "ควรเพิ่มสัดส่วน",
+  "ควรลดสัดส่วน",
+  "you should buy",
+  "you should sell",
+];
+
+test("Agent 1 prompt limits dislocation/reasoning: source facts, shared table, forward guidance, analyst-facing only", async () => {
+  const a1 = await systemPromptFor(impactBody());
+  assert.match(a1, /## Limits on dislocation_description and reasoning/);
+  assert.match(a1, /use ONLY facts stated in the news content and market outcome/);
+  assert.match(a1, /use ONLY the shared sector table above/);
+  assert.match(a1, /never contradict explicit forward guidance stated in the source/);
+  // Analyst-facing opportunity language is explicitly permitted…
+  assert.match(a1, /You MAY name a mispricing, an opportunity the market overlooked, or a possible accumulation opportunity/);
+  assert.match(a1, /ALLOWED: "ทองคำปรับลงสวนทางภาวะ risk-off อาจเป็นโอกาสสะสม/);
+  // …while addressing the client or instructing is not.
+  assert.match(a1, /You must NOT address the client or issue an instruction/);
+  assert.match(a1, /BANNED: "ควรซื้อทองคำตอนนี้"/);
+  assert.match(a1, /never an instruction to a client \(see Limits\)/);
+  // The canonical reference case keeps its original accumulation framing.
+  assert.match(a1, /framed gold's decline as a possible accumulation opportunity rather than a warning/);
+  // No blanket banned-word list any more.
+  assert.ok(!/never suggest or imply an action/.test(a1));
+});
+
+test("Agent 2 check 6 flags only client-directed instructions and contradicted forward guidance", async () => {
+  const a2 = await systemPromptFor({ agent: "factcheck", news: n006, agent1Output: n006Run.analysis });
+  assert.match(a2, /6\. Client-directed instructions and forward guidance — flag as a blocking issue ONLY when/);
+  assert.match(a2, /addresses the client or issues an instruction/);
+  assert.match(a2, /contradicts explicit forward guidance stated in the source/);
+  assert.match(a2, /Analyst-facing opportunity language is ALLOWED and must NOT be flagged/);
+  assert.match(a2, /อาจเป็นโอกาสสะสม/);
+  assert.ok(a2.indexOf("6. Client-directed instructions") < a2.indexOf("## Shared sector table"));
+});
+
+test("N006's cached dislocation text is analyst-facing, so it would pass check 6", () => {
+  // Inspection, not a model call: the cached text names an accumulation
+  // opportunity (allowed) and issues no client-directed instruction (the only
+  // action language check 6 blocks). Phase 4.1's blanket ban would have failed it.
+  const text = cachedDemoRuns.N006.analysis.dislocation_description;
+  assert.match(text, /สะสม/, "names the accumulation opportunity");
+  for (const phrase of CLIENT_DIRECTED) {
+    assert.ok(!text.includes(phrase), `cached N006 text contains "${phrase}"`);
+  }
+  // The same holds for the reasoning and for the other cached scenarios.
+  for (const [id, run] of Object.entries(cachedDemoRuns)) {
+    for (const field of ["dislocation_description", "reasoning"]) {
+      for (const phrase of CLIENT_DIRECTED) {
+        assert.ok(!(run.analysis[field] ?? "").includes(phrase), `${id}.${field}: "${phrase}"`);
+      }
+    }
+  }
+});
+
+test("Agent 3 keeps the strict client-facing ban regardless of the analyst-facing text", async () => {
+  const a3 = await systemPromptFor({
+    agent: "script",
+    analysis: n006Run.analysis,
+    client: n006Run.affectedClients[0],
+  });
+  assert.match(a3, /it does NOT license advice/);
+  assert.match(a3, /may itself name an opportunity .*you must NOT carry that into the script/s);
+  for (const banned of ["ควรซื้อ / ควรขาย / ควรถือ", "แนะนำให้…"]) assert.ok(a3.includes(banned), banned);
+});
+
+test("Agent 3 few-shot examples: in the prompt verbatim, within the cap, mechanisms hedged, facts plain", async () => {
+  const a3 = await systemPromptFor({
+    agent: "script",
+    analysis: n006Run.analysis,
+    client: n006Run.affectedClients[0],
+  });
+  const skill = readFileSync(new URL("../skills/rm-script-writing/SKILL.md", import.meta.url), "utf8")
+    .replace(/\r\n/g, "\n");
+  assert.equal(AGENT3_FEW_SHOT_EXAMPLES.length, 4);
+  for (const { label, script } of AGENT3_FEW_SHOT_EXAMPLES) {
+    assert.ok(a3.includes(`${label}:\n"${script}"`), `${label} rendered in prompt`);
+    assert.ok(skill.includes(`> "${script}"`), `${label} in sync with the skill doc`);
+    assert.ok(script.length <= MAX_SCRIPT_CHARS, `${label}: ${script.length} chars`);
+    assert.ok(/มีแนวโน้ม|อาจ/.test(script), `${label}: mechanism hedged`);
+    assert.ok(script.includes("2.3%"), `${label}: reported figure stated`);
+    // Phrasings that stated an unreported per-stock effect as fact.
+    for (const bad of ["กระแทก", "กดดันหุ้นกลุ่มส่งออกโดยตรง", "ถืออยู่ได้รับแรงกดดัน", "ควรซื้อ", "ควรขาย"]) {
+      assert.ok(!script.includes(bad), `${label}: contains "${bad}"`);
+    }
+  }
+  assert.match(a3, /No individual stock's move is reported/);
+});
+
+test("MAX_SCRIPT_CHARS = longest accepted cached script rounded up to the nearest 50", () => {
+  const lengths = Object.values(cachedDemoRuns).flatMap((r) =>
+    r.scripts.filter((s) => s.ok).map((s) => s.script.length),
+  );
+  const max = Math.max(...lengths);
+  assert.equal(max, 581);
+  assert.equal(MAX_SCRIPT_CHARS, Math.ceil(max / 50) * 50);
+  assert.equal(MAX_SCRIPT_CHARS, 600);
+});
+
+test("Agent 3 prompt states the character budget, the two-holding focus and fact/mechanism separation", async () => {
+  const a3 = await systemPromptFor({
+    agent: "script",
+    analysis: n006Run.analysis,
+    client: n006Run.affectedClients[0],
+  });
+  assert.match(a3, /Max 3 sentences AND at most 600 characters/);
+  assert.match(a3, /focus on at most TWO/);
+  assert.match(a3, /Reported facts vs mechanisms/);
+  assert.match(a3, /มีแนวโน้ม/);
+});
+
+test("over-long script is flagged length_exceeded and returned in full (never truncated)", async () => {
+  const client = n006Run.affectedClients[0];
+  const cases = [
+    { text: "ก".repeat(MAX_SCRIPT_CHARS), flagged: false },
+    { text: "ก".repeat(MAX_SCRIPT_CHARS + 1), flagged: true },
+    { text: "ข".repeat(MAX_SCRIPT_CHARS * 2), flagged: true },
+  ];
+  for (const { text, flagged } of cases) {
+    fetchCalls = [];
+    // The model also tries to set the flag itself — the server must ignore it.
+    fetchResponder = () => anthropicOk({ script: text, length_exceeded: !flagged });
+    const out = await call({ body: { agent: "script", analysis: n006Run.analysis, client } });
+    assert.equal(out.status, 200);
+    assert.equal(out.body.script, text, "script returned untruncated");
+    assert.equal(out.body.length_exceeded === true, flagged);
+    if (!flagged) assert.equal("length_exceeded" in out.body, false);
+  }
+});
+
+test("Agent 1 system prompt maps telecom as a rate-sensitive bond proxy", async () => {
+  const out = await call({ body: impactBody() });
+  assert.equal(out.status, 200);
+  const { system } = JSON.parse(fetchCalls[0].init.body);
+  assert.match(
+    system,
+    /Telecom \(ADVANC, TRUE, INTUCH\): interest rates — INVERSE \(bond proxy: stable cash flows, high dividends, high leverage\)/,
+  );
+  assert.match(system, /hurt property \/ utilities \/ telecom \/ rate-sensitive growth/);
 });
 
 test("sector_impacts reason: optional bounded string on factcheck and script payloads", async () => {

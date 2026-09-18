@@ -126,7 +126,10 @@ The team already has a deployed personal finance dashboard. New frontend must fe
   reasoning: "",
   dislocation: { detected: true, description: "ทองลงทั้งที่ควรขึ้น..." } | { detected: false },
   agent2Result: { is_valid, flagged_issues, adjusted_reasoning, factcheck_normalization_notes },
-  analysis: { /* normalized Agent 1 output, incl. event_scope / sector_impacts / normalization_notes when present */ },
+  analysis: { /* normalized Agent 1 output, incl. event_scope / sector_impacts / normalization_notes when present;
+                 for a CIO-reviewed cached item this is the REVIEWED analysis */ },
+  aiAnalysis: { /* CIO-reviewed cached items only: the original, unedited Agent 1 output */ },
+  cioReview: { reviewer, reviewedAt, changes: [{ path, before, after, rationale }] }, // CIO-reviewed cached items only
   affectedClients: [ /* Client + matchedHoldings (with matchedBy, direction) + priorityScore */ ],
   reviewedBy: null, approvedAt: null
 }
@@ -149,7 +152,7 @@ Output:
   "event_scope": "systemic|sector|single_company",
   "sector_impacts": [{ "sector": "banking", "direction": "positive|negative|neutral", "reason": "one short Thai sentence" }],
   "dislocation_detected": true,
-  "dislocation_description": "ทองลง 2.3% ทั้งที่ควรขึ้นในภาวะ risk-off — อาจเป็นโอกาสสะสม",
+  "dislocation_description": "ทองลง 2.3% ทั้งที่ควรขึ้นในภาวะ risk-off — อาจเป็นโอกาสสะสม (ความเชื่อมั่นปานกลาง)",
   "reasoning": "max 2 lines"
 }
 ```
@@ -159,14 +162,41 @@ Output:
   must be justified in `reasoning`.
 - **sector_impacts** — one entry per affected sector. Sectors must be the held
   sectors from the holdings summary. Mixed directions are expected (a rate hike:
-  banking positive, property negative); top-level `sentiment` is the net read and
-  never overrides a per-sector direction. Each entry carries a `reason`: one short
+  banking positive, property negative). Each entry carries a `reason`: one short
   Thai sentence giving the mechanism, using only facts from the news /
   marketOutcome plus general economic mechanisms, and a mechanism that fits that
-  sector.
+  sector per the shared sector table (below).
+- **sentiment (precise definition)** — the EXPECTED (theoretical) net impact of
+  the news on the listed held sectors, judged BEFORE any market reaction, and
+  consistent with `sector_impacts` (mostly negative → negative, balanced →
+  neutral). It never overrides a per-sector direction. The ACTUAL market reaction
+  belongs only in `dislocation_detected` / `dislocation_description` — a market
+  that moved the other way does not change `sentiment`; that gap is the
+  dislocation.
+- **Shared sector table** — `SECTOR_MECHANISM_TABLE` (api/claude-agent.js) is the
+  single definition of each sector's macro driver and characteristics, injected
+  verbatim into BOTH the Agent 1 and Agent 2 prompts so they cannot disagree
+  (bond proxies = utilities/power and telecom only; transport and property are
+  rate-sensitive for other reasons). skills/dislocation-analysis §4 carries the
+  same text; a test fails if either prompt or the skill doc drifts.
 - **Temperature** — all three agents are called at `temperature: 0`. For Agents
   1/2 this reduces, but does not eliminate, run-to-run classification flips (see
   Known Limitations → ranking variance).
+- **Limits on `dislocation_description` / `reasoning`** — facts only from the news
+  content and marketOutcome; mechanisms only from the shared sector table; never
+  contradict explicit forward guidance in the source (e.g. a dot plot signalling
+  another hike rules out "the rate cycle has peaked").
+- **Two-tier action language (Agent 1 vs Agent 3)** — Agent 1's output is
+  ANALYST-facing: a licensed CIO reads it at the Four Eyes gate, so it MAY name a
+  mispricing, an overlooked opportunity or a possible accumulation opportunity
+  ("อาจเป็นโอกาสสะสม") — that is what dislocation analysis is for, and the N006
+  money shot depends on it. It may NOT address the client or issue an instruction
+  (second-person advice or imperative: "ควรซื้อ", "แนะนำให้ขาย", "you should buy").
+  Agent 3's script is CLIENT-facing and keeps the strict ban: no
+  buy/sell/accumulate language at all (hard constraint #2 — Thai SEC investment
+  advice). Approval of the insight never licenses advice. A blanket ban on Agent 1
+  was tried in Phase 4.1 and reverted in 4.2: it would have failed N006, whose own
+  source text names an accumulation opportunity.
 - **Ticker discipline** — for `systemic` / `sector` events, `affected_tickers`
   holds only companies named in the news or with company-specific exposure stated
   in the reasoning; sector-wide exposure goes in `affected_sectors` /
@@ -208,18 +238,26 @@ held sectors and tickers are read from the same holdings summary Agent 1 saw):
 Input: original news + Agent 1 output (minus `normalization_notes`)
 Output: `{ "is_valid": bool, "flagged_issues": [], "adjusted_reasoning": "" }`
 
-Checks: (1) dislocation honesty, (2) sentiment direction, (3) narrative grounding,
-(4) `event_scope` consistent with the news text, (5) for each NON-neutral
-`sector_impacts` entry, a blocking issue if the `reason` is missing, contradicts
-the source, introduces facts not in the source (figures, events, company facts),
-or uses a mechanism that does not fit that sector (e.g. "bond proxy" for
-transport — that label fits telecom/utilities, not transport). A general,
+Checks: (1) dislocation honesty, (2) sentiment — flagged ONLY if inconsistent
+with the `sector_impacts` directions (never for diverging from the actual market
+reaction when a dislocation is described — that divergence IS the dislocation),
+(3) narrative grounding, (4) `event_scope` consistent with the news text, (5) for
+each NON-neutral `sector_impacts` entry, a blocking issue if the `reason` is
+missing, contradicts the source, introduces facts not in the source (figures,
+events, company facts), or uses a mechanism that does not fit that sector
+according to the shared sector table (example of a wrong label: calling
+transport a "bond proxy"; telecom and utilities are valid bond proxies). Agent 2
+judges mechanisms against the shared table, not its own taxonomy. A general,
 sector-appropriate economic mechanism is acceptable and is not flagged. Never
 flag WHICH sectors or tickers were listed — that stays out of scope (see the
 dislocation-analysis skill §6).
 - **Source-only verification:** judge claims only against the provided news
   content and marketOutcome; never flag a name, date, figure or event as wrong
   from background knowledge, which may be outdated.
+- **Check 6 (blocking):** `dislocation_description` or `reasoning` that addresses
+  the client or issues an instruction (second-person advice / imperative), or that
+  contradicts explicit forward guidance stated in the source. Analyst-facing
+  opportunity language is explicitly NOT flagged (see two-tier rule above).
 - `flagged_issues` lists only approval-blocking problems; observations the model
   concludes are acceptable are not listed.
 
@@ -242,6 +280,25 @@ Output: `{ "script": "Thai, max 3 sentences, informational tone, NEVER directive
   mechanism" (looked up from `analysis.sector_impacts` by the holding's
   `sector`); the script uses it to explain the effect and adds no new facts.
   Holdings without direction/reason produce the same prompt text as before.
+- **Length cap:** max 3 sentences AND at most `MAX_SCRIPT_CHARS` = 600 characters
+  (stated in the prompt). Thai has no reliable sentence delimiter, so characters
+  are the deterministic proxy; 600 = the longest accepted cached script (N006/C004,
+  581; the 13 N006/N003 scripts average 476.5) rounded up to the nearest 50. The
+  server never truncates: an over-long script is returned in full with
+  `length_exceeded: true`, ScriptViewer shows a warning, and the regen script
+  refuses to cache it.
+- **Focus:** at most two holdings per script (one from each side when mixed).
+- **Few-shot examples** live in `AGENT3_FEW_SHOT_EXAMPLES` (api/claude-agent.js),
+  rendered verbatim into the prompt and mirrored in skills/rm-script-writing §6
+  (test-enforced). They model the facts-vs-mechanisms rule: the reported figure
+  (gold −2.3%) is stated plainly; the effect on the client's stock is hedged
+  (มีแนวโน้ม / อาจ) because no per-stock move is reported; each is ≤ 600 chars.
+- **Reported facts vs mechanisms:** figures/moves stated in the approved insight
+  are said plainly; sector mechanisms are hedged ("มีแนวโน้ม", "อาจ"). A mechanism
+  is never presented as something that already happened to a specific stock
+  unless the approved insight reports that stock's move. (Agent 3 sees only the
+  approved analysis, not the raw news/marketOutcome — the approved insight is its
+  fact source.)
 - Endpoint validation: `matchedHoldings[].direction` ∈ positive|negative|neutral,
   `matchedBy` ∈ ticker|sector and `sector` a bounded string when present;
   `analysis.sector_impacts[].reason` an optional string ≤ 300 chars (optional —
@@ -326,13 +383,75 @@ a regen; a regen may legitimately change the on-screen ranking (decision: accept
 
 `npm run regen:cache` (scripts/regenerateDemoCache.mjs) may only be committed when:
 1. **Agent 2 returns `is_valid: true` for every cached item** — enforced by the
-   script (along with the dislocation-verdict, script-count, generic-script and
-   typo gates).
-2. **A human has reviewed the before/after ranking diff** the script prints per
-   regenerated item (`scripts/rankingDiff.mjs`). A changed ranking is NOT a
-   failure (see ranking variance above); if the new order is unacceptable for the
-   demo, discard the working-tree change instead of committing it.
+   script (along with the dislocation-verdict, script-count, generic-script,
+   typo and **script-length** gates: any `length_exceeded` script fails the run).
+2. **A human has reviewed the review block** the script prints per regenerated
+   item before writing: dislocation verdict + description, sector directions and
+   reasons, normalization notes, Agent 2 verdict, each script's character count,
+   and the before/after ranking diff (`scripts/rankingDiff.mjs`; a new item shows
+   its new ranking). A changed ranking is NOT a failure (see ranking variance
+   above); if the output is unacceptable for the demo, discard the working-tree
+   change instead of committing it.
 A ranking identical to the previous cache is no longer required.
+
+### CIO review of a cached scenario (human edit, no Agent 1/2 re-run)
+
+When a cached analysis needs a human correction, it is recorded — not
+regenerated — so the AI's original output stays on record.
+- **Review file (human-authored, committed):** `src/data/cioReviews/<newsId>.json`
+  = `{ newsId, reviewer, reviewedAt, changes: [{ path, before, after, rationale }] }`.
+  Allowed paths ONLY: `reasoning`, `sentiment`, `dislocation_description`,
+  `sector_impacts[<sector>].direction`, `sector_impacts[<sector>].reason`.
+  `before` must equal the cached value exactly (else rejected as stale);
+  direction/sentiment must be positive|negative|neutral; rationale is required.
+  Logic: `src/utils/cioReview.js` (pure).
+- **Drafts cannot be applied:** a reviewer starting with "DRAFT" or any change
+  containing `TEAM DECISION NEEDED` blocks the apply step.
+- **Apply:** `npm run regen:cache -- --apply-cio-review <newsId>` applies the
+  file to the cached Agent 1 output, re-runs `normalizeAgent1Output` +
+  `findAffectedClients`, prints the review block (each change with before/after/
+  rationale) and ranking diff, and regenerates **Agent 3 only** — Agent 1 and
+  Agent 2 are never called. Same gates as a normal regen (length cap, generic,
+  typo, failure artifact). Scripts use the CIO's `reasoning` if it was changed,
+  else Agent 2's `adjusted_reasoning`.
+- **Cache shape after apply:** `analysis` and `agent2Result` unchanged (the
+  AI's record; Agent 2's verdict refers to the ORIGINAL analysis), plus
+  `cioReview`, `reviewedAnalysis` (what matching and Agent 3 used),
+  recomputed `affectedClients` / `scripts`, and `scriptsGeneratedAt`.
+- **Agent 2's verdict covers the ORIGINAL AI output only.** A CIO edit is
+  deliberately NOT re-checked by a machine: the human gate is the authority, and
+  re-running Agent 2 on a CIO's own wording would either rubber-stamp it or
+  invite an LLM to overrule a licensed reviewer. The cache keeps
+  `agent2Result` next to the untouched `analysis`, and the UI labels it as the
+  original's verdict so nobody reads it as approval of the edit. The deterministic
+  checks (allowed paths, stale `before`, normalization, script gates) still run.
+- **UI:** useDraft uses `reviewedAnalysis` and passes `aiAnalysis` + `cioReview`;
+  ApprovalDashboard shows a "แก้ไขโดย CIO" panel with each change's original AI
+  text, edited text and rationale, marks the hero text as CIO-edited, and labels
+  the Agent 2 verdict as the original's.
+- **N007 status:** `src/data/cioReviews/N007.json` is a DRAFT (reviewer "DRAFT —
+  pending team review") with (a) a proposed dislocation_description edit removing
+  the "rate cycle near its peak" inference and the "accumulate oversold stocks"
+  suggestion, and (b) an open `TEAM DECISION NEEDED` on technology's direction
+  (discount-rate mechanism → negative vs weaker-baht export support → positive;
+  DELTA reported +3.00%). Not applied; the cache still shows the unedited AI text.
+
+How the script behaves:
+- **Single item:** `npm run regen:cache -- --only N007` (repeatable; the bare-id
+  form `-- N007` still works) regenerates only that item. Every other cached
+  item's serialized JSON is left byte-for-byte unchanged; only the file header
+  (timestamp, summary) is rewritten.
+- **Fixed vs reviewed dislocation:** N006 (`true`) and N003 (`false`) have fixed
+  expected verdicts (gated). N007 has none (`expectDislocation: null`) — its
+  verdict is Agent 1's call on real market data, printed for human review.
+- **Fail-fast:** if Agent 2 returns `is_valid: false`, Agent 3 is not called for
+  that item (saves one paid call per matched client).
+- **Failure artifacts:** on any failure the cache is not written; the run's Agent
+  1 output, Agent 2 output, ranked clients and scripts generated so far go to
+  `.regen-failed/<newsId>-<timestamp>.json` (gitignored) for review.
+- **Exit:** the script aborts by throwing, not `process.exit()`, because on
+  Windows exiting while fetch keep-alive sockets close trips a libuv assertion
+  (exit 0xC0000409 instead of 1).
 
 ### Live mode cannot detect dislocation (by construction)
 
@@ -377,7 +496,8 @@ api/
   fetch-live-news.js      — Vercel serverless Yahoo Finance RSS proxy (CORS + .BK suffix)
 tests/                    — node:test suites (`npm test`); fetch is stubbed, never hits Anthropic
 scripts/
-  regenerateDemoCache.mjs — `npm run regen:cache`: live pipeline → cachedDemoRun.js (gated; prints ranking diff)
+  regenerateDemoCache.mjs — `npm run regen:cache [-- --only <newsId> | --apply-cio-review <newsId>]`: → cachedDemoRun.js
+                            (gated, fail-fast; prints review block + ranking diff; failures → .regen-failed/)
   rankingDiff.mjs         — pure before/after ranking diff used by the regen script
 src/
   components/
@@ -387,9 +507,11 @@ src/
     ScriptViewer.jsx      — per-client scripts with copy button
   data/
     mockClients.js        — 10 Thai clients with realistic SET holdings
-    mockNews.js           — 5-6 pre-tested news items (include 1 dislocation case: Tariff/Gold)
-    cachedDemoRun.js      — frozen pipeline output for N006/N003 (demo never calls the API)
+    mockNews.js           — pre-tested news items: N001–N004, N006 (Tariff/Gold dislocation), N007 (Sep 2026 Fed hike, real market data)
+    cachedDemoRun.js      — frozen pipeline output for N006/N003/N007 (demo never calls the API)
+    cioReviews/<id>.json  — human-authored CIO review files (N007.json = DRAFT, not applied)
   utils/
+    cioReview.js          — validate/apply a CIO review (allowed paths, stale check, draft blocker)
     claudeAPI.js          — thin transport: POSTs the 3 agent calls to /api/claude-agent (no prompts, no key)
     matching.js           — findAffectedClients() (scope gate, matchedBy/direction) + calculatePriority() + buildHoldingsSummary()
     liveNews.js           — adapts /api/fetch-live-news items → pipeline news shape (live mode only)
@@ -407,6 +529,22 @@ Use the Trump Tariff case (told by K Asset judge herself at workshop):
 4. CIO approves via Four Eyes dashboard
 5. Script for conservative client vs aggressive client — same insight, different tone
 6. Judges see: AI that reasons (not just tags), industry-standard approval flow, and their own case study working live
+
+### Second cached scenario — N007, September 2026 Fed hike
+
+FOMC raised the federal funds target range 25bp to 3.75%-4.00% on Sep 16, 2026
+(12-0; prior range 3.50%-3.75%; first hike since July 2023; dot plot signalled a
+possible further hike in 2026; largely priced in). `marketOutcome` uses only the
+team-supplied Sep 17 data (Krungthep Turakij market-close report): SET 1,583.34,
++20.61 pts (+1.32%), turnover 62,452.42 MB; held most-active stocks DELTA, PTTEP,
+KTB, PTT, BBL; the Sep 17 MORNING market USD/THB rate (33.38-33.40, labelled as
+such); and the reported analyst view (buy-back after stocks had priced in the Fed
+path). Sector index changes and BOT reference rates were not available and are
+omitted; the Sep 16 SET close (1,562.73) is derived, not sourced, so it is not
+stated. The item deliberately does not say whether a dislocation exists.
+Cached result (regen 2026-09-17): systemic, dislocation detected (theory says a
+hike weighs on stocks; the SET rose instead), Agent 2 valid, 10 clients, scripts
+422–502 chars.
 
 ## Scoring Rubric Alignment (what slides/demo must prove)
 

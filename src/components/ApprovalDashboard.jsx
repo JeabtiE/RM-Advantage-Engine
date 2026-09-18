@@ -105,6 +105,10 @@ export default function ApprovalDashboard({ draft, onApprove, onReject }) {
   const notes = Array.isArray(analysis.normalization_notes)
     ? analysis.normalization_notes
     : [];
+  // Only cached, CIO-reviewed scenarios carry this; live drafts never do.
+  const cioChanges = Array.isArray(draft.cioReview?.changes)
+    ? draft.cioReview.changes
+    : [];
   const isPending = draft.status === DraftStatus.PENDING;
   const isApproved = draft.status === DraftStatus.APPROVED;
   const isRejected = draft.status === DraftStatus.REJECTED;
@@ -151,9 +155,21 @@ export default function ApprovalDashboard({ draft, onApprove, onReject }) {
             <p className="mt-2 text-sm leading-relaxed text-slate-100">
               {dislocated ? draft.dislocation.description : draft.reasoning}
             </p>
+            {cioChanges.length > 0 && (
+              <p className="mt-2 text-[11px] text-amber-300">
+                ฉบับที่ CIO ตรวจแก้แล้ว — ดูต้นฉบับจาก AI ในส่วน “แก้ไขโดย CIO”
+              </p>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Human CIO review recorded in the cache (src/data/cioReviews/*.json).
+          Every change shows the ORIGINAL AI text next to the edit and the
+          rationale, so nothing the AI wrote disappears from view. */}
+      {cioChanges.length > 0 && (
+        <CioReviewPanel review={draft.cioReview} changes={cioChanges} />
+      )}
 
       {/* Source news — what the analysis is grounded in. Collapsed to ~150
           chars by default (simple slice + boolean, no library) so the demo
@@ -255,6 +271,11 @@ export default function ApprovalDashboard({ draft, onApprove, onReject }) {
           <p className="text-xs font-semibold text-slate-500">
             ตรวจสอบข้อเท็จจริง (Agent 2)
           </p>
+          {cioChanges.length > 0 && (
+            <p className="mt-1 text-[11px] text-slate-400">
+              ผลตรวจนี้เป็นของต้นฉบับจาก AI (ก่อน CIO แก้ไข)
+            </p>
+          )}
           <p
             className={`mt-2 text-sm font-bold ${
               factOk ? "text-emerald-600" : "text-amber-600"
@@ -441,6 +462,57 @@ export default function ApprovalDashboard({ draft, onApprove, onReject }) {
         </div>
       )}
     </section>
+  );
+}
+
+// Thai labels for the review paths the CIO may edit (see src/utils/cioReview.js).
+function cioPathLabel(path) {
+  const top = {
+    reasoning: "เหตุผล (reasoning)",
+    sentiment: "Sentiment",
+    dislocation_description: "คำอธิบาย Dislocation",
+  }[path];
+  if (top) return top;
+  const m = /^sector_impacts\[(.+)\]\.(direction|reason)$/.exec(path ?? "");
+  if (m) return `${m[1]} — ${m[2] === "direction" ? "ทิศทาง" : "เหตุผลรายกลุ่ม"}`;
+  return path;
+}
+
+// CioReviewPanel — "แก้ไขโดย CIO": who reviewed, and for each change the
+// original AI text (before), the CIO's version (after) and the rationale.
+function CioReviewPanel({ review, changes }) {
+  const reviewedAt = review?.reviewedAt ? new Date(review.reviewedAt) : null;
+  return (
+    <div className="rounded-2xl border border-amber-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-slate-800">แก้ไขโดย CIO</p>
+        <p className="text-xs text-slate-500">
+          {review?.reviewer}
+          {reviewedAt && !Number.isNaN(reviewedAt.getTime())
+            ? ` · ${reviewedAt.toLocaleString("th-TH")}`
+            : ""}
+        </p>
+      </div>
+      <p className="mt-1 text-[11px] text-slate-400">
+        รายชื่อลูกค้าและสคริปต์ด้านล่างใช้ฉบับที่แก้ไขแล้ว — ต้นฉบับจาก AI แสดงไว้ในแต่ละรายการ
+      </p>
+      <ul className="mt-3 space-y-3">
+        {changes.map((c) => (
+          <li key={c.path} className="rounded-xl bg-slate-50 p-3 text-xs">
+            <p className="font-semibold text-slate-700">{cioPathLabel(c.path)}</p>
+            {/* Both versions stay plain and fully readable — no strikethrough:
+                the CIO is reviewing wording, and struck-through Thai is hard to
+                read on a screen the presenter is talking over. */}
+            <p className="mt-1.5 text-[11px] font-medium text-slate-400">ข้อความเดิมจาก AI</p>
+            <p className="leading-relaxed text-slate-500">{c.before}</p>
+            <p className="mt-1.5 text-[11px] font-medium text-emerald-600">ข้อความหลัง CIO แก้ไข</p>
+            <p className="leading-relaxed text-slate-800">{c.after}</p>
+            <p className="mt-1.5 text-[11px] font-medium text-slate-400">เหตุผลของ CIO</p>
+            <p className="leading-relaxed text-slate-600">{c.rationale}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

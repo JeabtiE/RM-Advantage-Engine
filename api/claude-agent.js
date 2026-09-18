@@ -76,6 +76,28 @@ function getApiKey() {
 }
 
 // ---------------------------------------------------------------------------
+// SECTOR_MECHANISM_TABLE — the ONE definition of each sector's macro driver and
+// characteristics. Injected verbatim into BOTH the Agent 1 prompt (to build
+// expectations and sector reasons) and the Agent 2 prompt (to judge those
+// reasons), so the two agents can never disagree about, say, which sectors are
+// bond proxies. The N007 regen failed exactly that way: Agent 1 called telecom a
+// bond proxy (per its table) while Agent 2 used a different taxonomy.
+// skills/dislocation-analysis/SKILL.md §4 carries this exact text; a test keeps
+// them in sync.
+// ---------------------------------------------------------------------------
+export const SECTOR_MECHANISM_TABLE = `- Banking (KBANK, SCB, BBL): interest rates — POSITIVE (higher rates widen net interest margins).
+- Energy / Oil & Gas (PTT, PTTEP): crude oil price — POSITIVE (revenue tracks oil).
+- Property (LH, AP, SPALI, CPN): interest rates — INVERSE (rate hikes raise mortgage costs).
+- Utilities / Power (GULF, GPSC): interest rates — INVERSE (bond proxy: capital-heavy, stable cash flows).
+- Telecom (ADVANC, TRUE, INTUCH): interest rates — INVERSE (bond proxy: stable cash flows, high dividends, high leverage).
+- Tourism / Airports (AOT, MINT, CENTEL): baht FX, oil, travel demand — weaker baht + lower oil = POSITIVE.
+- Exporters / Electronics (DELTA, KCE): baht FX — INVERSE to baht strength (weaker baht boosts export revenue).
+- Retail / Consumer (CPALL, CRC, HMPRO): domestic consumption — POSITIVE to spending, INVERSE to rate hikes.
+- Healthcare (BDMS, BH): defensive — low macro sensitivity, outperforms in risk-off.
+Bond proxies are ONLY the sectors labelled "bond proxy" above (utilities/power and telecom). Transport and property are rate-sensitive for other reasons (debt-funded infrastructure, mortgage costs) and are not bond proxies.
+Rate rule of thumb: rate hikes help banks, hurt property / utilities / telecom / rate-sensitive growth; rate cuts do the reverse.`;
+
+// ---------------------------------------------------------------------------
 // The Agent 1 system prompt embeds the dislocation methodology verbatim (in
 // English to save tokens). We ship the reasoning steps as text sent to the API
 // rather than a file reference so the model reasons the way a K Asset
@@ -105,15 +127,12 @@ Both classic safe havens FELL during a risk-off shock. That is the dislocation �
 IMPORTANT — this April 2025 reference case is INTERNAL teaching context only. It exists solely to help you recognize the dislocation PATTERN. It is NOT part of the news you are analyzing. Never name it, date it ("April 2025", "เมษายน 2025"), or cite it as a precedent/analogy in the "dislocation_description" or "reasoning" output fields. Those two fields must describe ONLY what is present in the actual news content and marketOutcome provided below, in your own words. A downstream fact checker sees only the news — any reference to this canonical case will read as an unsupported (hallucinated) claim.
 
 ## Thai (SET) sector -> macro-factor mappings (use to build the Step 1 expectation)
-- Banking (KBANK, SCB, BBL): interest rates — POSITIVE (higher rates widen net interest margins).
-- Energy / Oil & Gas (PTT, PTTEP): crude oil price — POSITIVE (revenue tracks oil).
-- Property (LH, AP, SPALI, CPN): interest rates — INVERSE (rate hikes raise mortgage costs).
-- Utilities / Power (GULF, GPSC): interest rates — INVERSE (capital-heavy bond proxies).
-- Tourism / Airports (AOT, MINT, CENTEL): baht FX, oil, travel demand — weaker baht + lower oil = POSITIVE.
-- Exporters / Electronics (DELTA, KCE): baht FX — INVERSE to baht strength (weaker baht boosts export revenue).
-- Retail / Consumer (CPALL, CRC, HMPRO): domestic consumption — POSITIVE to spending, INVERSE to rate hikes.
-- Healthcare (BDMS, BH): defensive — low macro sensitivity, outperforms in risk-off.
-Rate rule of thumb: rate hikes help banks, hurt property / utilities / rate-sensitive growth; rate cuts do the reverse.
+${SECTOR_MECHANISM_TABLE}
+
+## Limits on dislocation_description and reasoning
+- Facts: use ONLY facts stated in the news content and market outcome. Mechanisms: use ONLY the shared sector table above (plus the dislocation methodology).
+- Forward guidance: never contradict explicit forward guidance stated in the source. If the source says, for example, that the dot plot signals another hike, do not infer that the rate cycle has peaked; state the guidance as a source of uncertainty instead.
+- Audience: this analysis is read by a licensed CIO in a Four Eyes review, never by a client. You MAY name a mispricing, an opportunity the market overlooked, or a possible accumulation opportunity in analyst terms — that is what dislocation analysis is for. You must NOT address the client or issue an instruction: no second-person advice and no imperative ("ควรซื้อ", "แนะนำให้ขาย", "you should buy", "buy gold now"). ALLOWED: "ทองคำปรับลงสวนทางภาวะ risk-off อาจเป็นโอกาสสะสมที่ตลาดมองข้าม (ความเชื่อมั่นปานกลาง)". BANNED: "ควรซื้อทองคำตอนนี้" / "แนะนำให้ลูกค้าเพิ่มสัดส่วนทองคำ". Client-facing wording is Agent 3's job and is far stricter.
 
 ## Confidence
 Judge a flagged dislocation honestly: magnitude (large vs within normal daily range), breadth (multiple correlated factors diverging = higher confidence, one in isolation = likely noise), and simpler alternative explanations. A false flag wastes an RM's most valuable resource — a client's attention — so label borderline cases conservatively.
@@ -131,7 +150,10 @@ Classify the event before choosing tickers and sectors. The scope controls how w
 affected_tickers is NOT a list of every holding in the affected sectors. For "systemic" and "sector" events, include a ticker ONLY if (a) the company is named in the news or market outcome, or (b) your reasoning states a specific, company-level exposure (something true of that company and not of its sector peers). Sector-wide exposure belongs in affected_sectors and sector_impacts — the downstream matcher already reaches every client holding that sector. An empty affected_tickers list is correct for most macro events.
 
 ## Sector impacts — direction per sector
-For every sector you list, state which way THIS event pushes it. Mixed-direction events are normal and expected: a rate hike is positive for banking and negative for property at the same time. The top-level "sentiment" is only the net read; it must NOT override a per-sector direction — if banking is positive and property negative, say so in sector_impacts even if sentiment is "negative".
+For every sector you list, state which way THIS event pushes it. Mixed-direction events are normal and expected: a rate hike is positive for banking and negative for property at the same time.
+
+## Top-level sentiment — what it means
+"sentiment" is the EXPECTED (theoretical) net impact of this news on the held sectors you list, judged BEFORE any market reaction — the Step 1 expectation, not the observed move. It must be consistent with sector_impacts: mostly negative directions -> "negative", mostly positive -> "positive", balanced or unclear -> "neutral". It never overrides a per-sector direction. The actual market reaction does NOT change sentiment; if the market moved differently from this expectation, that belongs ONLY in dislocation_detected / dislocation_description.
 Sector values in affected_sectors and sector_impacts must be EXACTLY the sector names that appear in the client holdings universe (the last item inside each parenthesis, e.g. "banking"), lowercase. Do not invent sectors. Every sector in sector_impacts must also appear in affected_sectors.
 Every sector_impacts entry needs a "reason": ONE short Thai sentence giving the mechanism that links this news to that sector's direction. Use only facts that appear in the news content or market outcome, plus general economic mechanisms (e.g. "ดอกเบี้ยที่สูงขึ้นเพิ่มต้นทุนการกู้ยืม"). Do not introduce figures, events or company facts that are not in the source, and use a mechanism that genuinely fits that sector (per the mappings above).
 
@@ -140,11 +162,11 @@ Return ONLY a JSON object, no markdown fences, no prose around it, with exactly 
 {
   "affected_tickers": [string],        // held SET tickers with company-level exposure only (see ticker discipline above)
   "affected_sectors": [string],        // held sectors touched, per event_scope (see above)
-  "sentiment": "positive" | "negative" | "neutral",   // net direction for affected holdings
+  "sentiment": "positive" | "negative" | "neutral",   // expected (theoretical) net impact on the listed sectors, before market reaction; consistent with sector_impacts
   "event_scope": "systemic" | "sector" | "single_company",
   "sector_impacts": [ { "sector": string, "direction": "positive" | "negative" | "neutral", "reason": string } ],   // one entry per affected sector; reason = one short Thai sentence (see above)
   "dislocation_detected": boolean,     // true only if actual reaction genuinely diverges from expected
-  "dislocation_description": string,   // Thai. State (a) what was expected, (b) what actually happened, (c) the opportunity/confidence. Empty string if none.
+  "dislocation_description": string,   // Thai. State (a) what was expected, (b) what actually happened, (c) what the gap may indicate and your confidence, in analyst terms — never an instruction to a client (see Limits). Empty string if none.
   "reasoning": string                  // Thai, max 2 lines. The causal chain, not a news summary. For systemic events, it must justify the sectors you expanded to.
 }
 Write dislocation_description and reasoning in Thai (the RM-facing language). Keep the JSON keys and enum values in English exactly as above.`;
@@ -500,15 +522,19 @@ const AGENT2_SYSTEM_PROMPT = `You are a compliance-minded fact checker on a Thai
 
 ## What to check (only these — you have the context to judge them)
 1. Dislocation honesty — if dislocation_detected is true, does the market outcome actually describe a move that diverges from the stated expectation? Flag a dislocation that the outcome text does not support. If dislocation_detected is false, is that consistent with the outcome?
-2. Sentiment direction — does the sentiment match the news? Flag an obvious contradiction (e.g. clearly negative news labelled "positive").
+2. Sentiment — "sentiment" is the EXPECTED (theoretical) net impact of the news on the listed sectors, judged before any market reaction. Flag it ONLY if it is inconsistent with the sector_impacts directions (e.g. every listed sector "negative" but sentiment "positive"); if sector_impacts is absent, flag only an obvious contradiction with the news itself. NEVER flag sentiment for diverging from the actual market reaction when a dislocation is described — that divergence IS the dislocation (check 1 covers it).
 3. Narrative grounding — is the reasoning / dislocation_description built on facts (numbers, price moves, events) that actually appear in the news content or market outcome? Flag an invented number, a price move the outcome does not describe, or a named precedent/reference case that does not appear in the source (e.g. a dated historical analogy). Second-order causal reasoning FROM the source facts is allowed (see below) — flag only fabricated facts, not inferences drawn from real ones.
 4. Event scope — if event_scope is present, is it consistent with the news text? "single_company" = the news is about one named company; "sector" = about one industry as a whole; "systemic" = macro / market-wide (rates, tariffs, FX, risk-off). Flag a clear mismatch (e.g. a central-bank rate decision labelled "single_company", or one company's deal labelled "systemic").
 5. Sector directions and reasons — if sector_impacts is present, check every entry whose direction is "positive" or "negative" (skip "neutral" entries). Mixed directions are legitimate (a rate hike can be positive for banking and negative for property). Flag the entry as a blocking issue if ANY of these hold:
    - its "reason" is missing or empty;
    - the reason or direction contradicts the news content or market outcome (e.g. the text says property benefits but the direction is "negative");
    - the reason introduces factual claims not present in the source (figures, events, company-specific facts);
-   - the reason describes a mechanism that does not fit that sector (e.g. calling a sector a "bond proxy" when that label belongs to other sectors, such as utilities/power).
+   - the reason describes a mechanism that does not fit that sector according to the SHARED SECTOR TABLE below (e.g. calling transport a "bond proxy" — only utilities/power and telecom are bond proxies there). Judge mechanisms against that table, not your own sector taxonomy.
    A general, sector-appropriate economic mechanism (e.g. "higher rates raise borrowing costs" for property) is acceptable even though the source does not spell it out — do NOT flag it. Do not flag WHICH sectors are listed — only each entry's direction and reason.
+6. Client-directed instructions and forward guidance — flag as a blocking issue ONLY when dislocation_description or reasoning (a) addresses the client or issues an instruction (second-person advice or an imperative: "ควรซื้อ", "ควรขาย", "แนะนำให้ขาย", "you should buy", "buy gold now"), or (b) contradicts explicit forward guidance stated in the source (e.g. inferring the rate cycle has peaked when the source says the dot plot signals another hike). Analyst-facing opportunity language is ALLOWED and must NOT be flagged: naming a mispricing, an overlooked opportunity or a possible accumulation opportunity ("อาจเป็นโอกาสสะสม") is exactly what this analysis is for, and a licensed CIO reviews it before anyone acts on it.
+
+## Shared sector table (the SAME reference the analyst used)
+${SECTOR_MECHANISM_TABLE}
 
 ## Verify against the provided source ONLY
 Judge every claim solely against the news content and market outcome given below. Your own background knowledge may be outdated or incomplete: never flag a name, title, date, figure, rate level, or event as wrong because it differs from what you remember. If the source states it, treat it as true for this check.
@@ -516,7 +542,7 @@ Judge every claim solely against the news content and market outcome given below
 ## Do NOT flag affected_tickers or affected_sectors expansion (out of scope by design)
 Agent 1 is SUPPOSED to expand from the news to the specific SET tickers and sectors it touches, using documented sector→macro-factor mappings (the dislocation-analysis skill). A tariff/risk-off event legitimately reaches banking, property, healthcare, energy, transport and more via second-order effects, even when the news text only names "exporters." This expansion is Agent 1's job, and the resulting lists feed a SEPARATE deterministic matcher (matching.js) which is the actual source of truth for client exposure — not your concern here.
 
-Therefore: NEVER flag a ticker or sector merely because it is not named verbatim in the news. Do not treat sector expansion, second-order inference, or the length of affected_tickers/affected_sectors as a hallucination or overreach. You lack the holdings universe and the sector mappings Agent 1 used, so you are NOT positioned to judge those lists — leave them alone entirely.
+Therefore: NEVER flag a ticker or sector merely because it is not named verbatim in the news. Do not treat sector expansion, second-order inference, or the length of affected_tickers/affected_sectors as a hallucination or overreach. You lack the holdings universe, so you are NOT positioned to judge those lists — leave them alone entirely. (The shared sector table is for judging each listed sector's direction and reason, not for deciding which sectors belong in the list.)
 
 ## What you must NOT do
 - Do not flag affected_tickers / affected_sectors expansion (see above).
@@ -630,10 +656,57 @@ export function normalizeAgent2Output(output) {
 // The Four Eyes gate upstream approves the INSIGHT; it does not license ADVICE —
 // so every script, even an approved one, must stay on the information side.
 // ---------------------------------------------------------------------------
+// TWO-TIER ACTION-LANGUAGE RULE (why Agent 1 and Agent 3 differ):
+// Agent 1's dislocation text is ANALYST-facing — it is read by a licensed CIO in
+// the Four Eyes review, so it may name a mispricing or a possible accumulation
+// opportunity (that is the product's whole value). Agent 3's script is spoken to
+// a CLIENT, where buy/sell/accumulate language is regulated investment advice
+// under Thai SEC rules (CLAUDE.md hard constraint #2) — so the strict ban below
+// stays exactly as it is, and approval of the insight never licenses advice.
+
+// MAX_SCRIPT_CHARS — the deterministic proxy for the "max 3 sentences" rule.
+// Thai has no reliable sentence delimiter (no full stop; spaces separate clauses
+// as often as sentences), so the server cannot count sentences — it counts
+// characters. 600 = the longest ACCEPTED cached script (N006/C004, 581 chars;
+// the 13 cached N006/N003 scripts average 476.5) rounded up to the nearest 50.
+// Over-long scripts are flagged (length_exceeded), never truncated.
+export const MAX_SCRIPT_CHARS = 600;
+
+// AGENT3_FEW_SHOT_EXAMPLES — the Tariff/Gold few-shot scripts in the Agent 3
+// prompt. They must model the facts-vs-mechanisms rule, because the model copies
+// their style: REPORTED figures from the scenario (tariffs announced, global
+// equities fell, gold -2.3%, treasuries sold off, risk-off selling) are stated
+// plainly; the effect on the client's own stock is a MECHANISM (no per-stock move
+// is reported), so it is hedged ("มีแนวโน้ม", "อาจ"). Each stays within
+// MAX_SCRIPT_CHARS (a test checks both). Exported for those tests.
+export const AGENT3_FEW_SHOT_EXAMPLES = [
+  {
+    label: "conservative (client holds DELTA)",
+    script:
+      "เรียนคุณสมชายครับ สหรัฐประกาศขึ้นภาษีนำเข้าทั่วโลกและตลาดหุ้นทั่วโลกปรับตัวลง ซึ่งอาจกดดันหุ้นส่งออกอย่าง DELTA ที่คุณสมชายถืออยู่ เพราะกำแพงภาษีมีแนวโน้มเพิ่มต้นทุนการค้าและกระทบคำสั่งซื้อจากต่างประเทศ ที่ผิดปกติคือทองคำซึ่งควรเป็นสินทรัพย์ปลอดภัยกลับปรับลง 2.3% ซึ่งยังมีความไม่แน่นอนอยู่ หากคุณสมชายสนใจ ผมขอเรียนให้ทราบไว้เป็นข้อมูลและนัดคุยรายละเอียดเพิ่มเติมได้ครับ",
+  },
+  {
+    label: "moderate (client holds KCE)",
+    script:
+      "เรียนคุณวิภาครับ สหรัฐประกาศขึ้นภาษีนำเข้า ซึ่งมีแนวโน้มกระทบหุ้นส่งออกอย่าง KCE ที่คุณวิภาถืออยู่ เพราะรายได้หลักมาจากการส่งออกชิ้นส่วนที่อาจเผชิญกำแพงภาษีสูงขึ้น จุดที่น่าสนใจคือทองคำปรับลง 2.3% พร้อมตลาดหุ้น ทั้งที่ตามทฤษฎีควรเป็นสินทรัพย์ปลอดภัยที่ปรับขึ้น ซึ่งเป็นภาพที่ไม่ค่อยเกิดขึ้น หากคุณวิภาสนใจ เราพูดคุยรายละเอียดเพิ่มเติมกันได้ครับ",
+  },
+  {
+    label: "aggressive (client holds DELTA)",
+    script:
+      "เรียนคุณธนากรครับ สหรัฐประกาศขึ้นภาษีนำเข้าทั่วโลก ซึ่งมีแนวโน้มกดดันหุ้นส่งออกอย่าง DELTA ในพอร์ตของคุณธนากรมากเป็นพิเศษ เพราะพึ่งพารายได้จากการค้าระหว่างประเทศสูง แต่จุดที่ตลาดส่วนใหญ่มองข้ามคือทองคำปรับลง 2.3% ทั้งที่ในภาวะ risk-off ควรปรับขึ้น ซึ่งอาจสะท้อนแรงขายเพื่อเพิ่มสภาพคล่องมากกว่าการเปลี่ยนแปลงพื้นฐาน ผมมองว่าเป็นข้อมูลที่คุณธนากรน่าจะสนใจ หากอยากลงลึกโทรคุยกันได้เลยครับ",
+  },
+  {
+    label:
+      "Indirect-link example (client holds AOT — an airport stock, NOT a directly tariffed exporter, but still name it and state the indirect mechanism)",
+    script:
+      "เรียนคุณศิริพรครับ ข่าวขึ้นภาษีนำเข้าสหรัฐทำให้ตลาดเข้าสู่ภาวะ risk-off และมีแรงเทขายทั่วตลาด ซึ่งอาจกดดันหุ้น AOT ที่คุณศิริพรถืออยู่ด้วย แม้จะไม่ได้ถูกกระทบจากภาษีโดยตรง จุดที่น่าสนใจคือทองคำกลับปรับลง 2.3% ทั้งที่ควรเป็นสินทรัพย์ปลอดภัย ซึ่งอาจสะท้อนแรงขายเพื่อเพิ่มสภาพคล่อง หากคุณศิริพรสนใจ เราพูดคุยรายละเอียดเพิ่มเติมกันได้ครับ",
+  },
+];
+
 const AGENT3_SYSTEM_PROMPT = `You are an RM (relationship manager) at a Thai wealth-management firm writing a short phone script to call ONE client about an insight that has ALREADY been approved by the investment committee (Four Eyes). Your job is to convey the insight as information the client can consider — NOT to give investment advice.
 
 ## Core rule — informational only, never advice
-Scripts provide information for the client to consider (ให้ข้อมูลประกอบการตัดสินใจ). They must NEVER give an investment recommendation (คำแนะนำการลงทุน). Under Thai SEC rules, telling a client to buy/sell/increase/reduce a position is regulated investment advice and requires an IC/IP license this pipeline does not have. Surfacing a fact and inviting a conversation is not advice. Stay on the information side of that line — always. The Four Eyes approval confirms the insight is sound; it does NOT license advice.
+Scripts provide information for the client to consider (ให้ข้อมูลประกอบการตัดสินใจ). They must NEVER give an investment recommendation (คำแนะนำการลงทุน). Under Thai SEC rules, telling a client to buy/sell/increase/reduce a position is regulated investment advice and requires an IC/IP license this pipeline does not have. Surfacing a fact and inviting a conversation is not advice. Stay on the information side of that line — always. The Four Eyes approval confirms the insight is sound; it does NOT license advice. The approved analysis you are given is analyst-facing and may itself name an opportunity (e.g. "อาจเป็นโอกาสสะสม") — you must NOT carry that into the script: convey the fact and the mechanism, never the action.
 
 ## Language patterns — directive (BANNED) vs informational (SAFE)
 Directive language commands an action; informational language presents a fact and leaves the decision with the client.
@@ -655,15 +728,15 @@ Rule of thumb: if the sentence tells the client what to DO, rewrite it to tell t
 ## Personalization — name the holding and the mechanism (HARD REQUIREMENT, not a suggestion)
 This is the whole point of the call. An RM who says only "this news may be relevant to your portfolio" is no more useful than the client reading the news themselves — that is failure, not a soft miss. Every script MUST:
 1. Name at least ONE specific ticker from the client's affected holdings (the "Affected holdings in this client's portfolio" list below). Use the actual ticker symbol.
-2. Briefly state the MECHANISM connecting this news/dislocation to THAT holding — why this specific position is affected (e.g. "DELTA เป็นหุ้นส่งออก กำแพงภาษีเพิ่มต้นทุนการค้าและกระทบคำสั่งซื้อต่างประเทศ").
+2. Briefly state the MECHANISM connecting this news/dislocation to THAT holding — why this specific position is affected (e.g. "DELTA เป็นหุ้นส่งออก กำแพงภาษีมีแนวโน้มเพิ่มต้นทุนการค้าและกระทบคำสั่งซื้อต่างประเทศ").
 
 BANNED (an automatic failure): a generic relevance claim with no ticker and no mechanism — e.g. "ข้อมูลนี้อาจเกี่ยวข้องกับพอร์ตของคุณ" / "อาจกระทบพอร์ตของคุณ" standing alone. Never ship this.
 
-When the link is INDIRECT (the holding is caught in a broad move rather than hit head-on — e.g. a bank or airport stock in a market-wide risk-off selloff, not a directly tariffed exporter), you STILL name the ticker and state the indirect mechanism plainly ("หุ้น AOT ของคุณได้รับแรงกดดันจากการเทขายทั้งตลาดในภาวะ risk-off"). Indirect is fine and honest; generic is not. There is always a specific holding to name — name it.
+When the link is INDIRECT (the holding is caught in a broad move rather than hit head-on — e.g. a bank or airport stock in a market-wide risk-off selloff, not a directly tariffed exporter), you STILL name the ticker and state the indirect mechanism plainly ("หุ้น AOT ของคุณอาจได้รับแรงกดดันจากการเทขายทั้งตลาดในภาวะ risk-off"). Indirect is fine and honest; generic is not. There is always a specific holding to name — name it.
 
 ## Direction per holding — mixed exposure
 Each affected holding may be tagged with a direction: positive (the event tends to help it), negative (tends to hurt it), or neutral. Describe each holding's effect in the direction it is tagged — never call a "negative" holding a beneficiary or vice versa.
-When the client has BOTH positive and negative holdings, the script must mention both sides briefly (e.g. "หุ้น KBANK ในพอร์ตได้แรงหนุนจากดอกเบี้ยที่สูงขึ้น ขณะที่ LH อาจถูกกดดันจากต้นทุนสินเชื่อ"), still within the sentence limit. Presenting both sides is information, not a suggestion to rebalance — do not tell the client to shift between them.
+When the client has BOTH positive and negative holdings, the script must mention both sides briefly (e.g. "หุ้น KBANK ในพอร์ตมีแนวโน้มได้แรงหนุนจากดอกเบี้ยที่สูงขึ้น ขณะที่ LH อาจถูกกดดันจากต้นทุนสินเชื่อ"), still within the sentence limit. Presenting both sides is information, not a suggestion to rebalance — do not tell the client to shift between them.
 A holding may also carry a "sector mechanism": the approved, fact-checked reason this event moves that holding's sector. Use it to explain the effect on that holding in plain words. Do not add facts, figures or claims beyond it and the approved insight.
 
 ## Tone by risk profile
@@ -673,25 +746,21 @@ Tone changes the framing, not the informational stance. Every profile stays non-
 - aggressive — direct framing. Get to the point quickly and name the opportunity angle. Still NEVER directive — "this is an interesting dislocation worth looking at" is fine; "you should buy" is not.
 
 ## Structure
-1. Max 3 sentences.
-2. Lead with the relevant fact — the dislocation or the news, stated plainly.
-3. End with an open invitation to discuss, not a call to action ("หากสนใจ เราคุยรายละเอียดกันได้"), never a trade prompt.
+1. Max 3 sentences AND at most ${MAX_SCRIPT_CHARS} characters in total (the script is checked by character count — Thai characters, including spaces).
+2. If the client has many affected holdings, focus on at most TWO — the most relevant ones. If the client has both positive and negative holdings, pick one from each side. Do not list every holding.
+3. Lead with the relevant fact — the dislocation or the news, stated plainly.
+4. End with an open invitation to discuss, not a call to action ("หากสนใจ เราคุยรายละเอียดกันได้"), never a trade prompt.
 Address the client by name at the start.
 
+## Reported facts vs mechanisms — keep them separate
+- REPORTED FACTS are figures and moves stated in the approved insight below (the dislocation text and reasoning, which were fact-checked against the news and market data) — e.g. an index change or a price move the insight reports. State them plainly.
+- MECHANISMS are the sector mechanisms and theoretical effects (why a sector tends to move). State them with hedged language such as "มีแนวโน้ม" or "อาจ".
+- Never present a mechanism as something that already happened to a specific stock (e.g. do not write that TRUE "was pressured" or DELTA "gained support") unless the approved insight reports that stock's actual move. "DELTA มีแนวโน้มได้แรงหนุนจากค่าเงินบาทที่อ่อนค่า" is fine; "DELTA ได้แรงหนุนแล้ว" is not, unless reported.
+
 ## Few-shot examples — Tariff/Gold dislocation case
-Scenario: Trump announces global import tariffs. Theory says gold should rise as a safe haven in a risk-off move, but gold actually fell 2.3% alongside equities and US treasuries — an unusual dislocation. Note across all three: EACH names the client's own affected holding (in caps) and the mechanism tying the news to THAT holding, then adds the dislocation as the differentiated insight; tone escalates from cautious to direct; NONE say buy/sell or "ควร…"; each ends with an invitation to talk.
+Scenario: Trump announces global import tariffs. Reported: global equities fell in a risk-off move with broad selling, gold fell 2.3% and US treasuries sold off — although theory says gold should rise as a safe haven. No individual stock's move is reported. Note across all four: EACH names the client's own affected holding (in caps) and the mechanism tying the news to THAT holding, hedged (มีแนวโน้ม / อาจ) because it is a mechanism, not a reported move; the reported figures (gold -2.3%) are stated plainly; tone escalates from cautious to direct; NONE say buy/sell or "ควร…"; each ends with an invitation to talk.
 
-conservative (client holds DELTA):
-"เรียนคุณสมชายครับ ข่าวการขึ้นภาษีนำเข้าของสหรัฐกดดันหุ้นกลุ่มส่งออกโดยตรง รวมถึง DELTA ที่คุณสมชายถืออยู่ เพราะกำแพงภาษีเพิ่มต้นทุนการค้าและกระทบคำสั่งซื้อจากต่างประเทศ ที่ผิดปกติคือทองคำซึ่งควรเป็นสินทรัพย์ปลอดภัยกลับปรับลง 2.3% สวนทางกับที่ควรจะเป็น ซึ่งยังมีความไม่แน่นอนอยู่ หากคุณสมชายสนใจ ผมขอเรียนให้ทราบไว้เป็นข้อมูลและนัดคุยรายละเอียดเพิ่มเติมได้ครับ"
-
-moderate (client holds KCE):
-"เรียนคุณวิภาครับ ข่าวการขึ้นภาษีนำเข้าของสหรัฐกระทบหุ้นส่งออกอย่าง KCE ที่คุณวิภาถืออยู่ เพราะรายได้หลักมาจากการส่งออกชิ้นส่วนที่ต้องเผชิญกำแพงภาษีสูงขึ้น จุดที่น่าสนใจคือทองคำกลับปรับลง 2.3% พร้อมตลาดหุ้น ทั้งที่ตามทฤษฎีควรเป็นสินทรัพย์ปลอดภัยที่ปรับขึ้น ซึ่งเป็นภาพที่ไม่ค่อยเกิดขึ้น หากคุณวิภาสนใจ เราพูดคุยรายละเอียดเพิ่มเติมกันได้ครับ"
-
-aggressive (client holds DELTA):
-"เรียนคุณธนากรครับ ข่าวภาษีนำเข้าสหรัฐกระแทกหุ้นส่งออกอย่าง DELTA ในพอร์ตของคุณธนากรโดยตรง เพราะเป็นกลุ่มที่พึ่งพารายได้จากการค้าระหว่างประเทศมากที่สุด แต่จุดที่ตลาดส่วนใหญ่มองข้ามคือทองคำปรับลง 2.3% ทั้งที่ในภาวะ risk-off ควรปรับขึ้น อาจสะท้อนแรงขายเพื่อเพิ่มสภาพคล่องมากกว่าการเปลี่ยนพื้นฐาน ผมมองว่าเป็นข้อมูลที่คุณธนากรน่าจะสนใจ หากอยากลงลึกโทรคุยกันได้เลยครับ"
-
-Indirect-link example (client holds AOT — an airport stock, NOT a directly tariffed exporter, but still name it and state the indirect mechanism):
-"เรียนคุณศิริพรครับ ข่าวขึ้นภาษีนำเข้าสหรัฐทำให้ตลาดเข้าสู่ภาวะ risk-off และหุ้น AOT ที่คุณศิริพรถืออยู่ได้รับแรงกดดันจากการเทขายทั้งตลาด แม้จะไม่ได้ถูกกระทบจากภาษีโดยตรง จุดที่น่าสนใจคือทองคำกลับปรับลง 2.3% ทั้งที่ควรเป็นสินทรัพย์ปลอดภัย ซึ่งอาจสะท้อนแรงขายเพื่อเพิ่มสภาพคล่อง หากคุณศิริพรสนใจ เราพูดคุยรายละเอียดเพิ่มเติมกันได้ครับ"
+${AGENT3_FEW_SHOT_EXAMPLES.map((e) => `${e.label}:\n"${e.script}"`).join("\n\n")}
 
 ## Output
 Return ONLY a JSON object, no markdown fences, no prose around it, with exactly this key:
@@ -770,10 +839,16 @@ Write this client's phone script. Match the tone to their risk profile. Return t
     maxTokens: 1024,
   });
   const parsed = parseAIResponse(raw);
+  // length_exceeded is the server's verdict, never the model's.
+  if (parsed && typeof parsed === "object") delete parsed.length_exceeded;
   // Fix known term typos before the script leaves this function — every caller
   // (single or batch) gets the corrected text.
   if (parsed && typeof parsed.script === "string") {
     parsed.script = correctThaiTerms(parsed.script);
+    // Flag, do NOT truncate: cutting a Thai script mid-clause can drop the
+    // meaning or the very caveat that keeps it informational. The flag lets the
+    // UI warn the RM and the regen script refuse to cache it.
+    if (parsed.script.length > MAX_SCRIPT_CHARS) parsed.length_exceeded = true;
   }
   return parsed;
 }

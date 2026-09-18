@@ -355,7 +355,13 @@ test("reasons are trimmed and capped; a non-string reason is removed with a note
 test("cached analyses are unchanged by normalization and still yield the cached ranking", () => {
   for (const [id, run] of Object.entries(cachedDemoRuns)) {
     const out = normalizeAgent1Output(run.analysis, HELD, HELD_TICKERS);
-    assert.deepEqual(out, { ...run.analysis, normalization_notes: [] }, id);
+    // Pre-Phase-3 items gain an empty notes list; items cached after Phase 3
+    // (N007) were already normalized, so idempotency leaves them identical.
+    assert.deepEqual(
+      out,
+      { ...run.analysis, normalization_notes: run.analysis.normalization_notes ?? [] },
+      id,
+    );
     const ranked = findAffectedClients(out).sort((a, b) => b.priorityScore - a.priorityScore);
     assert.deepEqual(
       ranked.map((c) => [c.clientId, c.priorityScore]),
