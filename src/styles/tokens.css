@@ -1,0 +1,276 @@
+/* tokens.css — THE single source of design values for the whole app.
+ *
+ * Phase 6 rule: no component may hardcode a colour, radius or font. Everything
+ * below is exposed by Tailwind v4's @theme as a utility (bg-surface,
+ * text-text-2, border-hairline, rounded-card, font-sans …), so a change here is
+ * a change everywhere. If a component needs a value that isn't here, the value
+ * belongs here first.
+ *
+ * Direction: the iOS Stocks app — near-black, dense, typographic, numbers-first.
+ * Separation comes from hairlines and spacing, never from shadows or borders
+ * around cards.
+ */
+
+@theme {
+  /* --- Surfaces -----------------------------------------------------------
+   * bg      = the page. Near-black, not pure black: pure #000 makes hairlines
+   *           and dim greys disappear on a projector, which is what the demo
+   *           runs on.
+   * surface = grouped rows sit on this (one step lighter, no border needed).
+   * raised  = the one step above surface, for a selected row / active tab.
+   */
+  --color-bg: #0b0b0d;
+  --color-surface: #141417;
+  --color-raised: #1e1e23;
+
+  /* --- Text ---------------------------------------------------------------
+   * Three levels only. primary for values and headlines, secondary for labels
+   * and body prose, tertiary for captions and units. Contrast on --color-bg is
+   * verified in docs/screenshots/README (all three clear WCAG AA for their use).
+   */
+  --color-text: #f5f5f7;
+  --color-text-2: #a1a1aa;
+  --color-text-3: #8e8e97;
+
+  /* --- Semantic: EXPECTED impact direction --------------------------------
+   * Muted on purpose. In a stock app green/red mean an observed price move;
+   * here they almost always mean Agent 1's THEORETICAL expected impact, so they
+   * are desaturated relative to a real ticker colour and always ship with an
+   * arrow and a text label (never colour alone — see DIRECTION_META).
+   */
+  --color-up: #4ab87a;
+  --color-down: #e05c5c;
+  --color-flat: #8a8a92;
+
+  /* Tinted backings for the same three, for pills/rails. Low alpha so they
+   * read as a tint of the surface rather than a filled badge. */
+  --color-up-dim: #4ab87a1f;
+  --color-down-dim: #e05c5c1f;
+  --color-flat-dim: #8a8a9214;
+
+  /* --- Semantic: REPORTED market data -------------------------------------
+   * Step 4. A figure actually reported by the source (SET +1.32%, gold −2.3%)
+   * must not be mistaken for an expected-impact arrow, so it gets its own
+   * non-green/red accent used nowhere else.
+   */
+  --color-reported: #5b9ede;
+  --color-reported-dim: #5b9ede1f;
+
+  /* --- Attention (dislocation, warnings, pending) -------------------------- */
+  --color-alert: #e0a34a;
+  --color-alert-dim: #e0a34a1f;
+
+  /* --- Separators ---------------------------------------------------------
+   * ONE hairline colour, used instead of card borders. -strong is for the few
+   * places a group boundary must outrank a row boundary.
+   */
+  --color-hairline: #2a2a30;
+  --color-hairline-strong: #3a3a42;
+
+  /* Interactive boundaries. WCAG 1.4.11 wants 3:1 for the visual boundary of a
+   * control, and the hairlines above are deliberately below that — they are
+   * decorative separators (explicitly exempt) and tag containers whose meaning
+   * is carried by their text. A button's outline IS what identifies it as a
+   * control, so it gets its own token that clears 3:1 on both bg and surface. */
+  --color-control-border: #62626c;
+
+  /* --- Translucent materials (Phase 6.1, iOS 26) --------------------------
+   * FLOATING CHROME ONLY: pane headers, the sticky action bars and the strip
+   * behind the segmented bar. Content surfaces under long text stay opaque —
+   * blurred material behind a paragraph of Thai reduces effective contrast as
+   * the page scrolls, and the contrast table cannot then be verified against a
+   * single background.
+   *
+   * The alpha is 0.90 (e6) and that number is LOAD-BEARING, not taste. It was
+   * 0.72 until the Phase 6.1 contrast pass: composited against the worst case a
+   * pane can scroll under it — --color-raised carrying ~35% coverage of
+   * near-white text, blurred — 0.72 left the red Reject label at 4.26:1, under
+   * AA. At 0.90 the worst case is 5.13:1 and every colour used on chrome
+   * clears AA. Lowering it again re-breaks Reject first.
+   * See docs/screenshots/phase61/README.md for the full table.
+   */
+  --color-chrome: #0b0b0de6;
+  --blur-chrome: 20px;
+  --saturate-chrome: 180%;
+
+  /* Glass edges (Phase 6.3). 1px inset hairlines, not fills — the 0.90 fill
+   * alpha above is untouched, so no composited BACKGROUND changes and every
+   * Phase 6.1 ratio still holds.
+   *   highlight = the lit top edge, as if light catches the pane's lip
+   *   edge      = the faint outer boundary separating glass from content
+   *
+   * WHY 0x0c AND NOT SOMETHING PRETTIER. Text never reaches these strips —
+   * the tightest chrome padding in the app is 10px — so strictly they cannot
+   * affect any text ratio. Rather than rest on that geometry (a future padding
+   * change would silently invalidate it), the alpha is set so that EVEN TEXT
+   * SITTING DIRECTLY ON AN EDGE clears AA: at 0x0c the worst case is text-3 at
+   * 5.07:1 and the red Reject label at 4.59:1. At the 0x1f this started at,
+   * those were 4.00 and 3.62 — both under. Raising it re-breaks Reject first.
+   */
+  --color-glass-highlight: #ffffff0c;
+  --color-glass-edge: #ffffff0c;
+
+  /* --- Radius: concentric. Outer containers larger, nested smaller --------
+   * pane > card > control > tag. A nested radius must be smaller than its
+   * parent's or the curves fight; these four steps are the only ones allowed.
+   */
+  --radius-pane: 14px;
+  --radius-card: 10px;
+  --radius-control: 8px;
+  --radius-tag: 6px;
+
+  /* --- Motion: restrained. Selection and destination changes only ---------
+   * Every use is guarded by prefers-reduced-motion (see the base layer).
+   */
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+
+  /* --- Type ---------------------------------------------------------------
+   * IBM Plex Sans Thai FIRST so Thai never falls through to a system font.
+   * The browser picks per glyph, so Thai glyphs resolve here and Latin glyphs
+   * fall through to the rest of the stack.
+   *
+   * SF IS REFERENCED, NEVER BUNDLED. -apple-system / BlinkMacSystemFont /
+   * "SF Pro Text" name fonts already installed on the user's Apple device; the
+   * browser loads them from the OS. We do NOT ship, self-host, subset or
+   * download any SF file — Apple's licence does not permit web distribution,
+   * and referencing an installed system face is not distribution. Remove those
+   * three entries and Apple users simply get Inter; add a @font-face pointing
+   * at an SF file and the project is in breach. Do not do the latter.
+   *
+   * Inter stays: it is what Windows, Android and Linux actually render, and it
+   * is the numeral face the whole numbers-first layout was measured against.
+   */
+  --font-sans: "IBM Plex Sans Thai", -apple-system, BlinkMacSystemFont,
+    "SF Pro Text", system-ui, "Inter", ui-sans-serif, "Segoe UI", sans-serif;
+
+  /* Four sizes, and no component may use anything else.
+   *
+   * The brief asked for three (display / body / caption). A fourth earned its
+   * place: a list of ten percentages cannot be set at 44px, and the dislocation
+   * verdict cannot be set at body size without losing its status as the primary
+   * statement. Both are "the thing you read first in this block", so they share
+   * ONE token rather than becoming two — which also fixed a real inconsistency,
+   * the same percentage rendering at 18px in the approval list and 24px in the
+   * client list. */
+  --text-display: 2.75rem;      /* 44px — the one big number per view */
+  --text-display--line-height: 1.05;
+  --text-display--letter-spacing: -0.02em;
+  --text-lead: 1.25rem;         /* 20px — verdict statement + row percentage */
+  --text-lead--line-height: 1.5;
+  --text-body: 0.9375rem;       /* 15px — all prose, names, script text */
+  --text-body--line-height: 1.6;
+  --text-caption: 0.75rem;      /* 12px — labels, units, tickers, notes */
+  --text-caption--line-height: 1.45;
+}
+
+/* --- Base ---------------------------------------------------------------- */
+
+html {
+  background-color: var(--color-bg);
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tabular figures EVERYWHERE a number appears, so percentage columns line up
+ * digit-for-digit down the list. Applied as a utility rather than globally on
+ * body: Thai text has no tabular variant and forcing it on prose only risks
+ * odd spacing in mixed Thai/Latin runs. */
+@utility tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* A 1px rule that stays 1 *device* pixel on a 2x/3x screen, so the hairline
+ * grid does not thicken into visible borders on a retina projector. */
+@utility hairline-t {
+  border-top: 1px solid var(--color-hairline);
+}
+@utility hairline-b {
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+/* Focus ring — keyboard reachability must survive the restyle. */
+:where(button, a, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-text-2);
+  outline-offset: 2px;
+  border-radius: var(--radius-control);
+}
+
+/* --- Glass (floating chrome) ----------------------------------------------
+ * .chrome is the ONLY way a component opts into the material, so every
+ * fallback lives in exactly one place. FLOATING CHROME ONLY — headers, the
+ * segmented bar, sticky action bars, overlays. Long-form content surfaces stay
+ * opaque: blurred material behind a paragraph makes its effective contrast
+ * depend on whatever happens to be scrolling underneath, which cannot be
+ * verified against a single background.
+ *
+ * CONTRAST NOTE. The fill alpha is 0.90 and Phase 6.1 measured why (see the
+ * token). The glass treatment added here is deliberately all EDGES —
+ * inset hairlines drawn via box-shadow — so it adds no layer between text and
+ * its background and cannot move a single contrast ratio. If a future effect
+ * needs more transparency, put a solid scrim behind the text rather than
+ * lowering the alpha.
+ */
+@utility chrome {
+  background-color: var(--color-chrome);
+  backdrop-filter: blur(var(--blur-chrome)) saturate(var(--saturate-chrome));
+  -webkit-backdrop-filter: blur(var(--blur-chrome)) saturate(var(--saturate-chrome));
+  /* 1px lit top edge + faint outer boundary. inset so no layout shift. */
+  box-shadow:
+    inset 0 1px 0 0 var(--color-glass-highlight),
+    inset 0 0 0 1px var(--color-glass-edge);
+}
+
+/* No backdrop-filter (older Firefox, some embedded webviews): go fully opaque
+ * rather than translucent-without-blur, which would put text directly over
+ * scrolling content. The edges stay — they read fine on a solid surface. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .chrome {
+    background-color: var(--color-bg);
+  }
+}
+
+/* Users who ask for less transparency get none: solid surface, no blur. The
+ * edges are kept so the chrome is still visibly a distinct plane. */
+@media (prefers-reduced-transparency: reduce) {
+  .chrome {
+    background-color: var(--color-bg);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* Motion is opt-in per component and always removed for users who ask. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* --- App shell ------------------------------------------------------------
+ * The two-pane layout has NO page-level scroll: the shell is exactly the
+ * viewport height and each pane scrolls on its own. overscroll-behavior stops
+ * a pane that has hit its end from chaining the scroll to the document (which
+ * on macOS/iOS shows as a rubber-band on the whole app mid-demo).
+ */
+@utility pane-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-hairline-strong) transparent;
+}

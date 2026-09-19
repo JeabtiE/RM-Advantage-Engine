@@ -41,7 +41,7 @@ test("503 live_mode_disabled: no retry, error carries code and a readable messag
   await assert.rejects(analyzeImpact({}, ""), (err) => {
     assert.equal(err.status, 503);
     assert.equal(err.code, LIVE_MODE_DISABLED);
-    assert.match(err.message, /live analysis/);
+    assert.match(err.message, /Live analysis is off/);
     return true;
   });
   assert.equal(calls, 1);
@@ -99,7 +99,7 @@ test("response_truncated: no retry, code surfaced, message explains the cut-off"
   await assert.rejects(analyzeImpact({}, ""), (err) => {
     assert.equal(err.status, 502);
     assert.equal(err.code, RESPONSE_TRUNCATED);
-    assert.match(err.message, /ถูกตัดกลางคัน/);
+    assert.match(err.message, /exceeded the model length limit/);
     return true;
   });
   assert.equal(calls, 1);

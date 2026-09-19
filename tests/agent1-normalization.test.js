@@ -160,7 +160,12 @@ test("duplicate sectors keep the first entry", () => {
     HELD,
   );
   assert.deepEqual(out.sector_impacts, [{ sector: "property", direction: "negative" }]);
-  assert.ok(out.normalization_notes.some((n) => n.includes("ซ้ำ")));
+  // Full-string equality, not a substring probe: this pins the exact wording
+  // AND surfaces the second note the old `includes("ซ้ำ")` check silently missed.
+  assert.deepEqual(out.normalization_notes, [
+    'Sector "property" (negative) has no reason — check before approving',
+    'Dropped duplicate sector_impacts "property" (kept the first)',
+  ]);
 });
 
 test("malformed sector_impacts entries / non-array are dropped with notes", () => {
@@ -219,8 +224,9 @@ for (const [label, affected_tickers] of [
       HELD_TICKERS,
     );
     assert.equal(out.event_scope, "single_company");
-    assert.equal(out.normalization_notes.length, 1);
-    assert.match(out.normalization_notes[0], /ไม่มีลูกค้ารายใดถือหุ้น/);
+    assert.deepEqual(out.normalization_notes, [
+      "single_company news, but no client holds the named company — the client list is empty",
+    ]);
     assert.deepEqual(findAffectedClients(out, mockClients), []);
   });
 }

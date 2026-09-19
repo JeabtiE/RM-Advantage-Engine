@@ -20,7 +20,7 @@
 // generation — the approval survives and only Agent 3 is retried.
 //
 // Why a single status string drives the UI: the whole demo is a linear
-// pipeline, so one machine state (not a scatter of booleans) keeps NewsFeed /
+// pipeline, so one machine state (not a scatter of booleans) keeps NewsRail /
 // ApprovalDashboard / ScriptViewer reading from one source of truth.
 
 import { useState, useCallback } from "react";
@@ -52,6 +52,17 @@ export const DraftStatus = {
   // Four Eyes decision is not lost: reviewedBy/approvedAt stay on the draft and
   // only script generation is retried. See runScriptGeneration below.
   SCRIPT_ERROR: "script_error",
+};
+
+// PipelineStage — which paid call is currently in flight. PRESENTATION ONLY:
+// this is an observation of the existing pipeline, not a change to it. No call,
+// no ordering and no output below is altered — the UI simply gets to name the
+// stage it is waiting on instead of showing a generic spinner (Phase 6, Step 5).
+export const PipelineStage = {
+  AGENT1: "agent1",
+  MATCHING: "matching",
+  AGENT2: "agent2",
+  AGENT3: "agent3",
 };
 
 // Sort helper: highest portfolio exposure first — this IS the "call these
@@ -105,6 +116,14 @@ function getCachedRun(newsId) {
 // the cached path (it would otherwise resolve in one frame). It is NOT an API
 // call and adds no failure surface — set to 0 for a truly instant load.
 const DEMO_CACHE_DELAY_MS = 600;
+
+// The stages the cached replay walks through (see the cached branch of
+// analyzeNews). Same order, and the same three stages, as the live path.
+const CACHED_STAGE_SEQUENCE = [
+  PipelineStage.AGENT1,
+  PipelineStage.MATCHING,
+  PipelineStage.AGENT2,
+];
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export function useDraft() {
@@ -118,6 +137,8 @@ export function useDraft() {
   // Pre-filter verdict for the last analyzeNews() call. Held separately from
   // `error` because being irrelevant is a normal outcome, not a failure.
   const [relevance, setRelevance] = useState(null);
+  // See PipelineStage — observed, never used to drive control flow.
+  const [stage, setStage] = useState(null);
 
   // analyzeNews — run the pre-approval pipeline for one news item.
   // Agent 1 → deterministic matching → Agent 2, then park at "pending" for the
@@ -130,6 +151,7 @@ export function useDraft() {
     setScripts(null);
     setDraft(null);
     setRelevance(null);
+    setStage(null);
 
     // Demo cache short-circuit — N006 loads the frozen pipeline output instantly
     // (no Agent 1/2, no matching call), keeping the demo deterministic and
@@ -138,7 +160,16 @@ export function useDraft() {
     // unaware which path produced it. Cannot throw → no try/catch needed here.
     const cached = getCachedRun(news.id);
     if (cached) {
-      await sleep(DEMO_CACHE_DELAY_MS); // cosmetic; shows the analyzing state
+      // Step the SAME cosmetic delay through the three stage labels instead of
+      // spending it all on one. The cached entry is a frozen replay of exactly
+      // this pipeline, so naming the stages it came from is accurate; splitting
+      // an already-cosmetic pause changes no call, no timing budget and no
+      // output. Without this the loading card shows three dim rows and reads as
+      // "nothing is running".
+      for (const s of CACHED_STAGE_SEQUENCE) {
+        setStage(s);
+        await sleep(DEMO_CACHE_DELAY_MS / CACHED_STAGE_SEQUENCE.length);
+      }
       // A CIO-reviewed cache entry keeps the AI's original analysis untouched
       // and adds reviewedAnalysis (what matching + Agent 3 used). The draft
       // works on the reviewed version and carries the original + the review so
@@ -165,6 +196,7 @@ export function useDraft() {
         reviewedBy: null,
         approvedAt: null,
       });
+      setStage(null);
       setStatus(DraftStatus.PENDING);
       return;
     }
@@ -191,14 +223,17 @@ export function useDraft() {
 
     try {
       // [2] Agent 1 — Impact + Dislocation Analyzer (LLM call #1).
+      setStage(PipelineStage.AGENT1);
       const holdingsSummary = buildHoldingsSummary();
       const analysis = await analyzeImpact(news, holdingsSummary);
 
       // [3] Matching + priority scoring — deterministic JS, NO AI.
+      setStage(PipelineStage.MATCHING);
       const affectedClients = findAffectedClients(analysis).sort(byPriorityDesc);
 
       // [4] Agent 2 — Fact Checker (LLM call #2). Verifies Agent 1 vs the source
       // news before any human sees it (the machine half of Four Eyes).
+      setStage(PipelineStage.AGENT2);
       const agent2Result = await factCheck(news, analysis);
 
       // Assemble the draft the CIO will review. Shape follows CLAUDE.md's Draft.
@@ -221,12 +256,14 @@ export function useDraft() {
         reviewedBy: null,
         approvedAt: null,
       });
+      setStage(null);
       setStatus(DraftStatus.PENDING);
     } catch (err) {
       // Any pipeline failure (Agent 1/2 API error, bad JSON) lands here so the
       // UI can show it instead of crashing mid-demo.
       setError(err?.message ?? String(err));
       setErrorCode(err?.code ?? null);
+      setStage(null);
       setStatus(DraftStatus.ERROR);
     }
   }, []);
@@ -241,11 +278,14 @@ export function useDraft() {
     // renders them identically (typo guard already baked in at generation).
     const cached = getCachedRun(approvedDraft.draftId);
     if (cached) {
+      setStage(PipelineStage.AGENT3);
       await sleep(DEMO_CACHE_DELAY_MS); // cosmetic; shows the generating state
       setScripts(cached.scripts);
+      setStage(null);
       return;
     }
 
+    setStage(PipelineStage.AGENT3);
     try {
       // Feed the fact-checked reasoning (adjusted_reasoning) when Agent 2
       // corrected it, otherwise Agent 1's original — so scripts never carry a
@@ -261,6 +301,7 @@ export function useDraft() {
         approvedDraft.affectedClients,
       );
       setScripts(results);
+      setStage(null);
     } catch (err) {
       // generateAllScripts settles per-client, so a throw here is the whole batch
       // failing (e.g. programmer error), not one client's API call. Land in
@@ -276,6 +317,7 @@ export function useDraft() {
       setDraft((d) =>
         d ? { ...d, status: DraftStatus.SCRIPT_ERROR, scriptError: message } : d,
       );
+      setStage(null);
       setStatus(DraftStatus.SCRIPT_ERROR);
     }
   }, []);
@@ -348,6 +390,7 @@ export function useDraft() {
     setError(null);
     setErrorCode(null);
     setRelevance(null);
+    setStage(null);
   }, []);
 
   return {
@@ -357,6 +400,7 @@ export function useDraft() {
     error,
     errorCode,
     relevance,
+    stage,
     analyzeNews,
     approve,
     reject,
