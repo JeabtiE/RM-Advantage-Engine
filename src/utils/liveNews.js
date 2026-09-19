@@ -94,12 +94,12 @@ export async function fetchLiveNews({ tickers = [], signal } = {}) {
   // The endpoint answers 200 with { ok: false } for handled failures; a non-200
   // means the function itself did not run (dev proxy down, deploy issue).
   if (!res.ok) {
-    throw new Error(`ดึงข่าวสดไม่สำเร็จ (HTTP ${res.status})`);
+    throw new Error(`Couldn't fetch live news (HTTP ${res.status})`);
   }
 
   const payload = await res.json();
   if (!payload.ok) {
-    throw new Error(payload.error ?? "ดึงข่าวสดไม่สำเร็จ");
+    throw new Error(payload.error ?? "Couldn't fetch live news");
   }
 
   return {

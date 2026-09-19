@@ -395,8 +395,8 @@ Analyze this event using the three-step dislocation methodology. Return the JSON
 // matches from affected_sectors ONLY. A sector the model lists in sector_impacts
 // but forgets in affected_sectors would silently drop its clients off the call
 // list — so consistency is enforced here, in code, rather than trusted to the
-// prompt. Every change is recorded in normalization_notes (Thai, shown to the
-// CIO in the Four Eyes view) so nothing is adjusted silently.
+// prompt. Every change is recorded in normalization_notes (English UI chrome,
+// shown to the CIO in the Four Eyes view) so nothing is adjusted silently.
 // ---------------------------------------------------------------------------
 
 const DIRECTIONS = new Set(["positive", "negative", "neutral"]);
@@ -458,7 +458,7 @@ export function normalizeAgent1Output(output, heldSectors, heldTickers) {
   for (const key of ["affected_tickers", "affected_sectors"]) {
     if (out[key] !== undefined && !Array.isArray(out[key])) {
       out[key] = [];
-      notes.push(`${key} ไม่ใช่รายการ (array) — ตั้งเป็นรายการว่าง`);
+      notes.push(`${key} was not an array — reset to an empty list`);
     }
   }
 
@@ -469,7 +469,7 @@ export function normalizeAgent1Output(output, heldSectors, heldTickers) {
     const before = out.affected_sectors;
     const cleaned = [...new Set(before.filter((s) => typeof s === "string").map(normSector))].filter(Boolean);
     if (JSON.stringify(cleaned) !== JSON.stringify(before)) {
-      notes.push("ปรับรูปแบบ affected_sectors เป็นตัวพิมพ์เล็กและตัดรายการซ้ำ");
+      notes.push("Lowercased affected_sectors and removed duplicates");
     }
     out.affected_sectors = cleaned;
   }
@@ -478,31 +478,31 @@ export function normalizeAgent1Output(output, heldSectors, heldTickers) {
   if (out.sector_impacts !== undefined) {
     if (!Array.isArray(out.sector_impacts)) {
       delete out.sector_impacts;
-      notes.push("ลบ sector_impacts เนื่องจากรูปแบบไม่ถูกต้อง (ไม่ใช่ array)");
+      notes.push("Removed sector_impacts — not an array");
     } else {
       const seen = new Set();
       const kept = [];
       for (const entry of out.sector_impacts) {
         if (!entry || typeof entry !== "object" || typeof entry.sector !== "string" || !entry.sector.trim()) {
-          notes.push("ตัดรายการ sector_impacts ที่ไม่มีชื่อ sector ออก");
+          notes.push("Dropped sector_impacts entries with no sector name");
           continue;
         }
         const sector = normSector(entry.sector);
         if (!held.has(sector)) {
-          notes.push(`ตัด sector_impacts "${sector}" ออก — ไม่ใช่ sector ที่ลูกค้าถือครอง`);
+          notes.push(`Dropped sector_impacts "${sector}" — not a sector the book holds`);
           continue;
         }
         if (seen.has(sector)) {
-          notes.push(`ตัด sector_impacts "${sector}" ที่ซ้ำออก (ใช้รายการแรก)`);
+          notes.push(`Dropped duplicate sector_impacts "${sector}" (kept the first)`);
           continue;
         }
         seen.add(sector);
         let direction = typeof entry.direction === "string" ? entry.direction.trim().toLowerCase() : "";
         if (!DIRECTIONS.has(direction)) {
-          notes.push(`ทิศทางของ "${sector}" ไม่ถูกต้อง — ตั้งเป็น neutral`);
+          notes.push(`Invalid direction for "${sector}" — set to neutral`);
           direction = "neutral";
         } else if (entry.direction !== direction || entry.sector !== sector) {
-          notes.push(`ปรับรูปแบบ sector_impacts "${sector}" เป็นตัวพิมพ์เล็ก`);
+          notes.push(`Lowercased sector_impacts "${sector}"`);
         }
 
         // reason: trimmed and capped. A non-neutral entry WITHOUT a reason is
@@ -513,13 +513,13 @@ export function normalizeAgent1Output(output, heldSectors, heldTickers) {
           reason = entry.reason.trim();
           if (reason.length > MAX_SECTOR_REASON_CHARS) {
             reason = `${reason.slice(0, MAX_SECTOR_REASON_CHARS - 1)}…`;
-            notes.push(`ตัดเหตุผลของ "${sector}" ให้ยาวไม่เกิน ${MAX_SECTOR_REASON_CHARS} ตัวอักษร`);
+            notes.push(`Truncated the reason for "${sector}" to ${MAX_SECTOR_REASON_CHARS} characters`);
           }
         } else if (entry.reason !== undefined) {
-          notes.push(`ตัดเหตุผลของ "${sector}" ที่ไม่ใช่ข้อความออก`);
+          notes.push(`Removed a non-text reason for "${sector}"`);
         }
         if (!reason && direction !== "neutral") {
-          noteOnce(`sector "${sector}" (${direction}) ไม่มีเหตุผลประกอบ (reason) — โปรดตรวจสอบก่อนอนุมัติ`);
+          noteOnce(`Sector "${sector}" (${direction}) has no reason — check before approving`);
         }
 
         // Only { sector, direction, reason } survive — extra keys never reach matching.
@@ -534,7 +534,7 @@ export function normalizeAgent1Output(output, heldSectors, heldTickers) {
       for (const { sector, direction } of kept) {
         if (direction !== "neutral" && !affected.includes(sector)) {
           affected.push(sector);
-          notes.push(`เพิ่ม "${sector}" เข้า affected_sectors ให้ตรงกับ sector_impacts (มิฉะนั้นลูกค้ากลุ่มนี้จะหลุดจากรายชื่อ)`);
+          notes.push(`Added "${sector}" to affected_sectors to match sector_impacts (otherwise these clients drop off the list)`);
         }
       }
 
@@ -548,7 +548,7 @@ export function normalizeAgent1Output(output, heldSectors, heldTickers) {
       const removed = affected.filter((s) => neutral.has(s));
       if (removed.length > 0) {
         notes.push(
-          `นำ sector ที่เป็นกลาง (neutral) ออกจาก affected_sectors: ${removed.join(", ")} — ไม่ใช้จับคู่ลูกค้า`,
+          `Removed neutral sectors from affected_sectors: ${removed.join(", ")} — not used for client matching`,
         );
       }
       const finalAffected = affected.filter((s) => !neutral.has(s));
@@ -561,9 +561,9 @@ export function normalizeAgent1Output(output, heldSectors, heldTickers) {
     const scope = typeof out.event_scope === "string" ? out.event_scope.trim().toLowerCase() : "";
     if (!EVENT_SCOPES.has(scope)) {
       delete out.event_scope;
-      notes.push("ลบ event_scope ที่ไม่ถูกต้อง — ระบบจับคู่ใช้ค่าเริ่มต้น systemic");
+      notes.push("Removed an invalid event_scope — matching defaults to systemic");
     } else {
-      if (scope !== out.event_scope) notes.push(`ปรับรูปแบบ event_scope เป็น "${scope}"`);
+      if (scope !== out.event_scope) notes.push(`Lowercased event_scope to "${scope}"`);
       out.event_scope = scope;
     }
   }
@@ -578,7 +578,7 @@ export function normalizeAgent1Output(output, heldSectors, heldTickers) {
     const anyHeld = heldT ? tickers.some((t) => heldT.has(t)) : tickers.length > 0;
     if (!anyHeld) {
       noteOnce(
-        "ข่าวรายบริษัท (single_company) แต่ไม่มีลูกค้ารายใดถือหุ้นของบริษัทที่ระบุ — จึงไม่มีลูกค้าในรายชื่อ",
+        "single_company news, but no client holds the named company — the client list is empty",
       );
     }
   }
@@ -703,14 +703,14 @@ export function normalizeAgent2Output(output) {
   } else if (Array.isArray(rawIssues)) {
     issues = rawIssues.filter((i) => typeof i === "string" && i.trim() !== "");
     if (issues.length !== rawIssues.length) {
-      notes.push("ตัดรายการ flagged_issues ที่ว่างหรือไม่ใช่ข้อความออก");
+      notes.push("Dropped blank or non-text flagged_issues entries");
     }
   } else if (typeof rawIssues === "string" && rawIssues.trim() !== "") {
     issues = [rawIssues];
-    notes.push("แปลง flagged_issues จากข้อความเดี่ยวเป็นรายการ");
+    notes.push("Converted flagged_issues from a single string to a list");
   } else {
     issues = [];
-    notes.push("flagged_issues มีรูปแบบไม่ถูกต้อง — ตั้งเป็นรายการว่าง");
+    notes.push("flagged_issues had an invalid shape — reset to an empty list");
   }
   out.flagged_issues = issues;
 
@@ -718,8 +718,8 @@ export function normalizeAgent2Output(output) {
   if (out.is_valid !== derived) {
     notes.push(
       derived
-        ? "ปรับ is_valid เป็น true — ไม่มีประเด็นที่ถูกระบุใน flagged_issues"
-        : `ปรับ is_valid เป็น false — มีประเด็นที่ถูกระบุ ${issues.length} ข้อ`,
+        ? "Set is_valid to true — flagged_issues is empty"
+        : `Set is_valid to false — ${issues.length} issue(s) flagged`,
     );
     out.is_valid = derived;
   }

@@ -304,6 +304,11 @@ function containsTerm(text, term) {
 // content. NO AI (CLAUDE.md hard constraint #6). Returns the match evidence so
 // the UI can show WHY something was skipped rather than silently dropping it.
 //
+// LANGUAGE (Phase 6.2): `reason` is UI chrome and is ENGLISH. The Thai in
+// SECTOR_KEYWORDS / MACRO_KEYWORDS above is MATCHING DATA — the terms searched
+// for inside Thai news text — and must never be translated: doing so would
+// change which items the filter screens out, which is matching logic.
+//
 //   { relevant, reason, matchedTickers, matchedSectors, matchedMacroFactors }
 export function filterRelevantNews(
   newsItem,
@@ -335,9 +340,8 @@ export function filterRelevantNews(
     return {
       relevant: false,
       reason:
-        "ไม่เกี่ยวข้องกับฐานลูกค้า (not relevant to our client base) — " +
-        "ไม่พบชื่อหุ้นที่ลูกค้าถือครอง sector ที่เกี่ยวข้อง หรือปัจจัยมหภาคที่ส่งผลต่อพอร์ต " +
-        "จึงข้ามการวิเคราะห์ของ Agent 1",
+        "Not relevant to the client book — no held ticker, no held sector " +
+        "and no macro factor affecting the book was found, so Agent 1 was skipped",
       matchedTickers: [],
       matchedSectors: [],
       matchedMacroFactors: [],
@@ -345,16 +349,16 @@ export function filterRelevantNews(
   }
 
   const hits = [
-    matchedTickers.length ? `หุ้น: ${matchedTickers.join(", ")}` : null,
-    matchedSectors.length ? `sector: ${matchedSectors.join(", ")}` : null,
+    matchedTickers.length ? `tickers: ${matchedTickers.join(", ")}` : null,
+    matchedSectors.length ? `sectors: ${matchedSectors.join(", ")}` : null,
     matchedMacroFactors.length
-      ? `ปัจจัยมหภาค: ${matchedMacroFactors.join(", ")}`
+      ? `macro: ${matchedMacroFactors.join(", ")}`
       : null,
   ].filter(Boolean);
 
   return {
     relevant: true,
-    reason: `เกี่ยวข้องกับฐานลูกค้า — ${hits.join(" | ")}`,
+    reason: `Relevant to the client book — ${hits.join(" | ")}`,
     matchedTickers,
     matchedSectors,
     matchedMacroFactors,

@@ -1,7 +1,12 @@
 // Server-side render of ApprovalDashboard (via Vite's SSR loader, so JSX is
 // transformed exactly as in the app — no new dependencies). Verifies the
-// "แก้ไขโดย CIO" panel shows every change with the ORIGINAL AI text, the edit and
-// the rationale, and that drafts without a review render no panel.
+// "Edited by CIO" panel shows every change with the ORIGINAL AI text, the edit
+// and the rationale, and that drafts without a review render no panel.
+//
+// Phase 6.1: the panel CHROME is English. The fixture content below stays Thai
+// on purpose — reviewer name, edited text and rationale are content the pipeline
+// (or a human reviewer) produced, and asserting they survive verbatim is what
+// proves the translation touched chrome only.
 //
 // Run: npm test
 
@@ -75,24 +80,27 @@ test("CIO panel lists each change with original AI text, edited text and rationa
     reviewedAnalysis: { ...base.analysis, dislocation_description: edited },
   };
   const html = render(draftFrom(entry, { withReview: true }));
-  assert.ok(html.includes("แก้ไขโดย CIO"));
-  assert.ok(html.includes("CIO ทดสอบ"));
-  assert.ok(html.includes("คำอธิบาย Dislocation"));
-  assert.ok(html.includes("ข้อความเดิมจาก AI"));
-  assert.ok(html.includes("ข้อความหลัง CIO แก้ไข"));
+  assert.ok(html.includes("Edited by CIO"));
+  assert.ok(html.includes("CIO ทดสอบ"), "reviewer name passes through untranslated");
+  assert.ok(html.includes("Dislocation description"));
+  assert.ok(html.includes("Original (AI)"));
+  assert.ok(html.includes("After CIO edit"));
   // Both versions must read as plain text — no strikethrough on the AI original.
   assert.ok(!/line-through/.test(html));
   assert.ok(html.includes(original), "original AI text still visible");
   assert.ok(html.includes(edited));
-  assert.ok(html.includes("ตัดคำชี้นำการลงทุน"));
-  assert.ok(html.includes("ผลตรวจนี้เป็นของต้นฉบับจาก AI"), "Agent 2 verdict labelled as the original's");
-  assert.ok(html.includes("ฉบับที่ CIO ตรวจแก้แล้ว"), "hero marks the edited text");
+  assert.ok(html.includes("ตัดคำชี้นำการลงทุน"), "CIO rationale passes through untranslated");
+  assert.ok(
+    html.includes("This verdict covers the original AI output"),
+    "Agent 2 verdict labelled as the original's",
+  );
+  assert.ok(html.includes("CIO-edited version"), "hero marks the edited text");
 });
 
 test("no review -> no CIO panel (cached N006 and unreviewed N007)", () => {
   for (const id of ["N006", "N007"]) {
     const html = render(draftFrom(cachedDemoRuns[id], { withReview: false }));
-    assert.ok(!html.includes("แก้ไขโดย CIO"), id);
-    assert.ok(!html.includes("ผลตรวจนี้เป็นของต้นฉบับจาก AI"), id);
+    assert.ok(!html.includes("Edited by CIO"), id);
+    assert.ok(!html.includes("This verdict covers the original AI output"), id);
   }
 });

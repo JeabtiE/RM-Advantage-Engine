@@ -3,7 +3,27 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <!-- Set before first paint so the page never flashes white on load. -->
+    <meta name="theme-color" content="#0b0b0d" />
     <title>RM Advantage Engine — Client Portfolio Intelligence</title>
+
+    <!--
+      Fonts. IBM Plex Sans Thai carries the Thai UI (the app is Thai-primary);
+      Inter carries Latin text and, critically, the numerals — the whole layout
+      is numbers-first and Plex Thai's Latin figures are not as even.
+      The browser picks per glyph, so both must be present.
+
+      preconnect first: Google Fonts serves CSS from one origin and the woff2
+      from another, and without the second preconnect the font files wait on a
+      fresh TLS handshake — a visible Thai reflow mid-demo.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
   </head>
   <body>
     <div id="root"></div>

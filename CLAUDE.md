@@ -229,10 +229,14 @@ held sectors and tickers are read from the same holdings summary Agent 1 saw):
 - **`single_company` is never changed to another scope.** If `affected_tickers`
   is empty or none of its tickers is held, the scope stays (the client list will
   be empty) and a note explains that no client holds the named company.
-- Every change is recorded in `normalization_notes` (Thai, shown to the CIO);
-  notes for conditions that persist after normalization are added once, so a
-  second pass adds nothing. Model-written `normalization_notes` are discarded
-  before normalizing, and the notes are never sent to Agent 2.
+- Every change is recorded in `normalization_notes` (**English** since Phase
+  6.2 — they are written by our own code, so they are UI chrome, not model
+  output; shown to the CIO). Notes for conditions that persist after
+  normalization are added once, so a second pass adds nothing. Model-written
+  `normalization_notes` are discarded before normalizing, and the notes are
+  never sent to Agent 2 or Agent 3 — verified: `factCheck` destructures the
+  field out before building its prompt, and `generateScript` interpolates only
+  named analysis fields.
 
 ### Agent 2 — Fact Checker
 Input: original news + Agent 1 output (minus `normalization_notes`)
@@ -264,8 +268,8 @@ dislocation-analysis skill §6).
 **`normalizeAgent2Output(output)`** (pure, idempotent): `is_valid` is DERIVED —
 true iff `flagged_issues` is empty. Missing issues → `[]`; blank/non-string issues
 dropped; a bare string becomes a one-item list. Changes are recorded in
-`factcheck_normalization_notes` (Thai, shown to the CIO only when present);
-model-written notes of that name are discarded.
+`factcheck_normalization_notes` (**English** since Phase 6.2, shown to the CIO
+only when present); model-written notes of that name are discarded.
 
 ### Agent 3 — Script Generator (per client)
 Input: approved analysis + client (name, riskProfile, matchedHoldings incl. `direction` when present)
@@ -443,6 +447,23 @@ a regen; a regen may legitimately change the on-screen ranking (decision: accept
    above); if the output is unacceptable for the demo, discard the working-tree
    change instead of committing it.
 A ranking identical to the previous cache is no longer required.
+
+### Cached N007 still carries a Thai normalization note (Phase 6.2)
+
+Phase 6.2 translated the system-authored normalization notes and the relevance
+filter's `reason` to English (they are our own copy, never model input). The
+committed cache predates that change, so **`N007.analysis.normalization_notes`
+still holds its original Thai note**:
+
+> `"นำ sector ที่เป็นกลาง (neutral) ออกจาก affected_sectors: energy, healthcare — ไม่ใช้จับคู่ลูกค้า"`
+
+It is the ONLY one: N006 and N003 have no `normalization_notes` at all (they
+predate Phase 3.2), and `factcheck_normalization_notes` is `[]` on all three.
+The cache was deliberately NOT edited — it is the frozen record of a real run,
+and hand-editing it would break that guarantee for a cosmetic gain. The note
+becomes English on the next `npm run regen:cache`, which is a paid run and
+needs the usual human review. Until then the N007 approval view shows one Thai
+line under the English "Automatic normalization" heading.
 
 ### CIO review of a cached scenario (human edit, no Agent 1/2 re-run)
 

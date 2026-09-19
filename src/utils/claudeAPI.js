@@ -40,11 +40,11 @@ function resolveEndpoint() {
 // neutral "disabled" notice instead of a failure card.
 export const LIVE_MODE_DISABLED = "live_mode_disabled";
 
-// Shown wherever the error message surfaces (NewsFeed card, per-client script
+// Shown wherever the error message surfaces (approval pane, per-client script
 // errors), so even a view that doesn't special-case the code reads sensibly.
 const LIVE_MODE_DISABLED_MESSAGE =
-  "การวิเคราะห์สด (live analysis) ปิดอยู่บนเดโมสาธารณะ — " +
-  "ข่าวที่มีผลวิเคราะห์สำรองไว้ (cached demo) ยังใช้งานได้ตามปกติ";
+  "Live analysis is off on the public demo — " +
+  "items with a cached reviewed analysis still work normally.";
 
 // The model hit its output-token budget and the JSON came back cut off. Distinct
 // from a malformed response: nothing is wrong with the news or the prompt, and
@@ -52,8 +52,8 @@ const LIVE_MODE_DISABLED_MESSAGE =
 export const RESPONSE_TRUNCATED = "response_truncated";
 
 const RESPONSE_TRUNCATED_MESSAGE =
-  "ผลวิเคราะห์ยาวเกินขีดจำกัดของโมเดล จึงถูกตัดกลางคัน — " +
-  "ระบบไม่ได้ใช้ผลที่ไม่สมบูรณ์ โปรดลองใหม่หรือแจ้งผู้ดูแลระบบให้ขยายขีดจำกัด";
+  "The analysis exceeded the model length limit and was cut off — " +
+  "the incomplete result was discarded. Retry, or ask an administrator to raise the limit.";
 
 // postAgent — single POST to /api/claude-agent for one agent. The endpoint owns
 // the Anthropic retry/backoff (max 2, 429 → 10s); we do NOT re-retry an HTTP
