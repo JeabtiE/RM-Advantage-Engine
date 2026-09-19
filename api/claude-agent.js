@@ -31,7 +31,8 @@
 //   stack traces, upstream bodies, or prompt text ever leave this function.
 
 const API_URL = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-sonnet-4-6";
+// Exported so the stability eval can record which model produced its numbers.
+export const MODEL = "claude-sonnet-4-6";
 const MAX_RETRIES = 2;
 const RATE_LIMIT_BACKOFF_MS = 10_000; // 429 handling: wait 10s before retry
 

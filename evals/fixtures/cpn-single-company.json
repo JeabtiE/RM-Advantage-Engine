@@ -1,0 +1,9 @@
+{
+  "_comment": "Single-company eval fixture. mockNews.js has no single-company item and this phase must not add one, so the eval keeps its own. Same shape as a mockNews item. Live-mode style: no companion price feed, so marketOutcome is the 'no market data' sentinel wording (see src/utils/liveNews.js) — Agent 1 should return dislocation_detected: false for it.",
+  "id": "EVAL-CPN",
+  "headline": "Central Pattana and Mitsubishi Estate announce $330m mixed-use project",
+  "content": "Central Pattana and Mitsubishi Estate announce $330m mixed-use project\n\nCentral Pattana, Thailand's largest shopping-mall developer, and Japan's Mitsubishi Estate said on Tuesday they will jointly develop a mixed-use project in Bangkok worth about $330 million, combining retail, office and residential space.\n\n[ที่มา: eval fixture | หุ้นที่เกี่ยวข้องในพอร์ตลูกค้า: CPN]",
+  "source": "Eval fixture (single-company case)",
+  "publishedAt": "2026-09-17T03:00:00Z",
+  "marketOutcome": "ไม่มีข้อมูลราคาตลาดประกอบข่าวชิ้นนี้ — ข่าวชุดทดสอบนี้ให้เฉพาะเนื้อหาข่าว ไม่มีข้อมูลการเคลื่อนไหวของราคาหลังข่าวออก ห้ามอนุมานหรือสร้างตัวเลขการเคลื่อนไหวของราคาขึ้นเอง และไม่สามารถประเมิน dislocation ได้จากข้อมูลนี้"
+}

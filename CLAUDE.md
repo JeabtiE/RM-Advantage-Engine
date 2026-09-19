@@ -368,6 +368,20 @@ all 10 clients matched and C002 ranked at 100% on neutral-only holdings. Now
 `affected_sectors` (matching.js unchanged), and the CIO view labels them
 "เป็นกลาง — ไม่ใช้จับคู่ลูกค้า".
 
+### Agent 1 can exceed max_tokens and return unparseable JSON (found 2026-09-19)
+
+`callClaude` sends `max_tokens: 2048` for Agent 1. Since Phase 3.2 added a Thai
+`reason` per sector, a systemic item touching all seven held sectors can run past
+that ceiling: the response is cut mid-string, `parseAIResponse` throws, and the
+endpoint returns `502 invalid_model_output`. Measured in the stability eval
+(evals/results/): **N007 failed this way on 1 of 1 attempt** — 3,006 raw chars
+ending mid-word — while N006 (5 runs, 2,466–2,610 chars) stayed just under. The
+cached N007 entry was generated before the limit was hit, so the demo path is
+unaffected; LIVE analysis of a seven-sector item is the exposure. Not fixed in
+the eval phase (it measures, it does not change behaviour): raising Agent 1's
+max_tokens, or capping the number of sector_impacts entries, is a separate
+change with its own regen and review.
+
 ### Client ranking varies run to run (accepted)
 
 Agent 1's per-sector direction is not fully stable even at `temperature: 0`.

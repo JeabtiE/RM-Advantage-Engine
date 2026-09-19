@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test": "node --test \"tests/*.test.js\" && node src/test-filter.js",
     "regen:cache": "node scripts/regenerateDemoCache.mjs",
+    "eval:stability": "node evals/stability.mjs",
     "check:tickers": "node scripts/check-tracked-tickers.mjs"
   },
   "dependencies": {
