@@ -662,6 +662,65 @@ test("upstream 4xx body is not returned to the caller", async () => {
   assert.deepEqual(out.body, { error: "upstream_error" });
 });
 
+test("stop_reason max_tokens -> response_truncated, and the cut JSON is never parsed", async () => {
+  // A truncated answer is still valid-looking JSON up to the cut, so the old
+  // code blamed the model's formatting (invalid_model_output). The truncation
+  // check must run BEFORE parseAIResponse.
+  const cut = '{"affected_tickers": ["BBL"], "affected_sectors": ["banking", "telec';
+  for (const agent of [
+    impactBody(),
+    { agent: "factcheck", news: n006, agent1Output: n006Run.analysis },
+    { agent: "script", analysis: n006Run.analysis, client: n006Run.affectedClients[0] },
+  ]) {
+    fetchCalls = [];
+    fetchResponder = () =>
+      new Response(JSON.stringify({ stop_reason: "max_tokens", content: [{ type: "text", text: cut }] }), {
+        status: 200,
+      });
+    const out = await call({ body: agent });
+    assert.equal(out.status, 502, agent.agent);
+    assert.deepEqual(out.body, { error: "response_truncated" }, agent.agent);
+    // Not retryable: the same request would truncate again.
+    assert.equal(fetchCalls.length, 1, agent.agent);
+  }
+});
+
+test("a complete response with stop_reason end_turn is unaffected", async () => {
+  fetchResponder = () =>
+    new Response(
+      JSON.stringify({
+        stop_reason: "end_turn",
+        content: [{ type: "text", text: JSON.stringify({ script: "เรียนคุณทดสอบ" }) }],
+      }),
+      { status: 200 },
+    );
+  const out = await call({
+    body: { agent: "script", analysis: n006Run.analysis, client: n006Run.affectedClients[0] },
+  });
+  assert.equal(out.status, 200);
+  assert.equal(out.body.script, "เรียนคุณทดสอบ");
+});
+
+test("per-agent max_tokens: Agent 1 > Agent 2 > Agent 3, sized above observed responses", async () => {
+  const sent = {};
+  for (const [name, body] of [
+    ["impact", impactBody()],
+    ["factcheck", { agent: "factcheck", news: n006, agent1Output: n006Run.analysis }],
+    ["script", { agent: "script", analysis: n006Run.analysis, client: n006Run.affectedClients[0] }],
+  ]) {
+    fetchCalls = [];
+    fetchResponder = () => anthropicOk(name === "script" ? { script: "ok" } : { ok: true });
+    await call({ body });
+    sent[name] = JSON.parse(fetchCalls[0].init.body).max_tokens;
+  }
+  assert.equal(sent.impact, 6144);
+  assert.equal(sent.factcheck, 4096);
+  assert.equal(sent.script, 1024, "Agent 3 unchanged");
+  // Agent 1 must clear the truncation seen in the eval (3,006 chars emitted at
+  // 2048 tokens) with real headroom.
+  assert.ok(sent.impact >= 2048 * 2);
+});
+
 test("unparseable model output is not returned to the caller", async () => {
   fetchResponder = () =>
     new Response(JSON.stringify({ content: [{ type: "text", text: "RAW MODEL TEXT not json" }] }), {

@@ -21,8 +21,8 @@
 //
 // Same retry/backoff and per-agent maxTokens as claudeAPI.js:
 //   - max 2 retries, 429 → wait 10s before retry, 5xx/network → short backoff
-//   - maxTokens: 2048 for impact/factcheck, 1024 for script (measured — see
-//     claudeAPI.js for the token-utilization rationale).
+//   - per-agent output budgets: AGENT1_MAX_TOKENS / AGENT2_MAX_TOKENS /
+//     AGENT3_MAX_TOKENS (sized from measured response lengths — see constants).
 //
 // PUBLIC ENDPOINT HARDENING: this URL is reachable by anyone and spends a paid
 // key, so every request passes these gates, in order, before any Anthropic call:
@@ -55,6 +55,30 @@ const MAX_BODY_BYTES = 64_000;
 // a small-in-bytes but pathological payload from fanning out.
 const MAX_ARRAY_ITEMS = 100;
 const MAX_DEPTH = 6;
+
+// --- Per-agent output budgets -------------------------------------------------
+// Sized in CHARACTERS observed, then converted with a deliberately pessimistic
+// rule of thumb: Thai costs roughly 2-3 tokens per word (and the JSON keys,
+// tickers and sector names add ASCII on top), so ~1 token per 1.5 chars is the
+// planning assumption here.
+//
+// AGENT 1 — scales with the number of HELD SECTORS: every sector carries a Thai
+// `reason` (Phase 3.2), so a systemic item touching all 7 held sectors is the
+// worst case. Measured (stability eval, 2026-09-19): complete 7-sector answers
+// ran 2,466-2,610 chars, and N007 was CUT at 2048 tokens having emitted 3,006
+// chars. Worst case allowance: 7 sectors x ~300-char reason + dislocation
+// description + reasoning + tickers ≈ 3,500-4,000 chars ≈ ~2,700 tokens. 6144
+// is >2x the longest successful response and ~1.5x the worst case — headroom
+// for a longer book (more held sectors) without another silent truncation.
+const AGENT1_MAX_TOKENS = 6144;
+// AGENT 2 — echoes Agent 1's reasoning back in adjusted_reasoning plus its
+// flagged issues, so it tracks Agent 1's size. Raised alongside Agent 1: the
+// eval has no Agent 2 length data, and a truncated fact check fails the same
+// silent way.
+const AGENT2_MAX_TOKENS = 4096;
+// AGENT 3 — one script per call, hard-capped at MAX_SCRIPT_CHARS (600). Cached
+// scripts run 305-581 chars, so 1024 tokens is already ~2.5x the cap. UNCHANGED.
+const AGENT3_MAX_TOKENS = 1024;
 
 const ALLOWED_AGENTS = new Set(["impact", "factcheck", "script"]);
 const RISK_PROFILES = new Set(["conservative", "moderate", "aggressive"]);
@@ -229,6 +253,18 @@ async function callClaude({ system, user, maxTokens = 1024 }) {
       }
 
       const data = await res.json();
+      // Truncation is checked BEFORE parsing. A max_tokens stop cuts the JSON
+      // mid-string, so parsing it would throw "Failed to parse Claude JSON" and
+      // blame the model's formatting for what is really our token budget. The
+      // eval hit exactly that on N007 (3,006 chars, cut mid-word). Not
+      // retryable: the same request would truncate again.
+      if (data?.stop_reason === "max_tokens") {
+        throw new Error(
+          `Response truncated at max_tokens (${maxTokens}); received ${
+            data?.content?.find((b) => b.type === "text")?.text?.length ?? 0
+          } chars`,
+        );
+      }
       const text = data?.content?.find((b) => b.type === "text")?.text;
       if (!text) throw new Error("Claude response contained no text block");
       return text;
@@ -285,13 +321,13 @@ ${holdingsSummary}
 
 Analyze this event using the three-step dislocation methodology. Return the JSON object only.`;
 
-  // Thai is token-heavy and the dislocation_description + reasoning run long;
-  // 1024 truncates the JSON mid-string (invalid) on verbose events, so give it
-  // real headroom — silent truncation is a live-demo killer.
+  // Budget: AGENT1_MAX_TOKENS (see the constant for the sizing). Silent
+  // truncation is a live-demo killer, and since Phase 3.2 the per-sector
+  // reasons make a 7-sector answer the worst case.
   const raw = await callClaude({
     system: AGENT1_SYSTEM_PROMPT,
     user,
-    maxTokens: 2048,
+    maxTokens: AGENT1_MAX_TOKENS,
   });
   const parsed = parseAIResponse(raw);
   // Ticker discipline (only named / company-specific tickers on systemic and
@@ -587,12 +623,13 @@ ${JSON.stringify(toVerify, null, 2)}
 
 Verify the Agent 1 analysis against the original news and market outcome above. Return the JSON object only.`;
 
-  // adjusted_reasoning can echo Agent 1's full reasoning; match Agent 1's
-  // headroom so a verbose correction is never truncated into invalid JSON.
+  // adjusted_reasoning can echo Agent 1's full reasoning, so this tracks
+  // Agent 1's size (AGENT2_MAX_TOKENS) — a truncated fact check fails silently
+  // in the same way.
   const raw = await callClaude({
     system: AGENT2_SYSTEM_PROMPT,
     user,
-    maxTokens: 2048,
+    maxTokens: AGENT2_MAX_TOKENS,
   });
   const parsed = parseAIResponse(raw);
   // Same rule as Agent 1: the notes field is the server's, never the model's.
@@ -837,7 +874,7 @@ Write this client's phone script. Match the tone to their risk profile. Return t
   const raw = await callClaude({
     system: AGENT3_SYSTEM_PROMPT,
     user,
-    maxTokens: 1024,
+    maxTokens: AGENT3_MAX_TOKENS,
   });
   const parsed = parseAIResponse(raw);
   // length_exceeded is the server's verdict, never the model's.
@@ -1090,6 +1127,7 @@ function publicErrorFor(err) {
   const msg = String(err?.message ?? "");
   if (msg.startsWith("Missing Anthropic API key")) return [500, "server_misconfigured"];
   if (msg.includes("(429)")) return [429, "upstream_rate_limited"];
+  if (msg.startsWith("Response truncated at max_tokens")) return [502, "response_truncated"];
   if (msg.startsWith("Failed to parse Claude JSON")) return [502, "invalid_model_output"];
   return [502, "upstream_error"];
 }

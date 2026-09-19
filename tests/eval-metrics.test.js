@@ -194,3 +194,15 @@ test("toMarkdown: a partially completed item shows the error AND the runs that f
   assert.match(md, /\| property \| 2\/2 \|/, "partial metrics still tabulated");
   assert.match(md, /No run completed, so there is nothing to measure/);
 });
+
+test("isTransportError: endpoint codes end the item; codeless failures are retryable", async () => {
+  const { isTransportError } = await import("../evals/stability.mjs");
+  // Endpoint verdicts (measured outcomes) — never retried.
+  for (const code of ["response_truncated", "invalid_model_output", "live_mode_disabled", "upstream_error"]) {
+    assert.equal(isTransportError(Object.assign(new Error("x"), { code })), false, code);
+  }
+  // Transport failures — retried, as production does.
+  assert.equal(isTransportError(new TypeError("fetch failed")), true);
+  assert.equal(isTransportError(Object.assign(new Error("gateway"), { status: 504, code: null })), true);
+  assert.equal(isTransportError(undefined), true);
+});

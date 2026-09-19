@@ -368,19 +368,40 @@ all 10 clients matched and C002 ranked at 100% on neutral-only holdings. Now
 `affected_sectors` (matching.js unchanged), and the CIO view labels them
 "เป็นกลาง — ไม่ใช้จับคู่ลูกค้า".
 
-### Agent 1 can exceed max_tokens and return unparseable JSON (found 2026-09-19)
+### Agent 1 exceeded max_tokens and returned unparseable JSON — FIXED (Phase 5b.1)
 
-`callClaude` sends `max_tokens: 2048` for Agent 1. Since Phase 3.2 added a Thai
-`reason` per sector, a systemic item touching all seven held sectors can run past
-that ceiling: the response is cut mid-string, `parseAIResponse` throws, and the
-endpoint returns `502 invalid_model_output`. Measured in the stability eval
-(evals/results/): **N007 failed this way on 1 of 1 attempt** — 3,006 raw chars
-ending mid-word — while N006 (5 runs, 2,466–2,610 chars) stayed just under. The
-cached N007 entry was generated before the limit was hit, so the demo path is
-unaffected; LIVE analysis of a seven-sector item is the exposure. Not fixed in
-the eval phase (it measures, it does not change behaviour): raising Agent 1's
-max_tokens, or capping the number of sector_impacts entries, is a separate
-change with its own regen and review.
+**Found by the stability eval, 2026-09-19** (evals/results/), not by a user:
+`callClaude` sent `max_tokens: 2048` for Agent 1, and since Phase 3.2 added a
+Thai `reason` per sector, a systemic item touching all seven held sectors ran
+past it. **N007 failed on 1 of 1 attempt** — 3,006 raw chars cut mid-word — while
+N006 (5 runs, 2,466–2,610 chars) stayed just under. The cut JSON then failed
+`parseAIResponse`, so the endpoint blamed the model (`502
+invalid_model_output`) for what was our own budget. The cached N007 entry was
+generated before the limit was hit, so the demo path was never affected; live
+analysis of a seven-sector item was.
+
+**Fix (two parts):**
+1. Per-agent budgets as named constants: `AGENT1_MAX_TOKENS` 6144 (>2x the
+   longest successful response, ~1.5x the 7-sector worst case),
+   `AGENT2_MAX_TOKENS` 4096 (it echoes Agent 1's reasoning), `AGENT3_MAX_TOKENS`
+   1024 (unchanged — scripts are capped at 600 chars).
+2. Truncation is now detected, not inferred: `callClaude` checks
+   `stop_reason === "max_tokens"` BEFORE parsing and returns
+   `502 response_truncated` with a server log line. The client maps that code to
+   a specific Thai message and NewsFeed shows an amber "ผลวิเคราะห์ถูกตัดกลางคัน"
+   card with a retry, instead of the generic failure card. It is not retried
+   server-side: the same request would truncate again.
+
+### Agent 1 can emit unescaped quotes inside Thai strings (open, found 2026-09-19)
+
+Separate from the truncation above and NOT fixed. In the post-fix N007 eval, run
+4 of 5 returned a COMPLETE response (2,947 chars, closing brace present) that
+`JSON.parse` still rejected: the model wrote an unescaped double quote inside a
+Thai string — `…ตลาดอาจมองว่าการขึ้นดอกเบี้ยครั้งนี้เป็น "buy the fact" มากกว่า…`. The endpoint
+correctly returns `502 invalid_model_output` and nothing malformed reaches the
+CIO, but the run is lost (1 of 5 attempts here, ~20%). Options if it recurs:
+tell Agent 1 not to use double quotes inside string values, or repair/retry on
+parse failure. Both change behaviour, so neither was done in the eval phase.
 
 ### Client ranking varies run to run (accepted)
 

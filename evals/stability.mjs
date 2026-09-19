@@ -27,7 +27,7 @@
 
 import { mkdirSync, readFileSync, writeFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { analyzeImpact } from "../src/utils/claudeAPI.js";
 import { buildHoldingsSummary, findAffectedClients } from "../src/utils/matching.js";
@@ -35,10 +35,25 @@ import { mockNews } from "../src/data/mockNews.js";
 import { itemMetrics, toMarkdown } from "./metrics.mjs";
 import { MODEL, normalizeAgent1Output, heldSectorsFromSummary, heldTickersFromSummary } from "../api/claude-agent.js";
 
+// isTransportError — did the request fail BEFORE the endpoint judged anything?
+// Endpoint failures always carry a machine code ({ error: "<code>" } →
+// err.code), e.g. response_truncated or invalid_model_output: those are the
+// model/validation outcomes this eval is measuring, so they end the item and
+// must never be retried (retrying would also skew the stability numbers).
+// A transport failure (fetch rejected, proxy hiccup, a 5xx with no JSON body)
+// has no code and says nothing about the model — production retries it inside
+// claudeAPI/callClaude, so the eval retries it too rather than losing the item.
+export function isTransportError(err) {
+  return !err?.code;
+}
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RESULTS_DIR = join(HERE, "results");
 const FIXTURES_DIR = join(HERE, "fixtures");
 const TEMPERATURE = 0; // what api/claude-agent.js sends; recorded in the report
+// Transport retries per RUN (network/proxy failures only — see isTransportError).
+// Each retry spends a call and counts against --max-calls.
+const TRANSPORT_RETRIES = 1;
 
 function parseArgs(argv) {
   const opts = { runs: 5, delay: 1500, items: [], maxCalls: null, out: null, endpoint: null };
@@ -147,7 +162,7 @@ async function main() {
   };
 
   for (const news of selected) {
-    const record = { newsId: news.id, headline: news.headline, source: news._source, outputs: [], clientSets: [], raw: [] };
+    const record = { newsId: news.id, headline: news.headline, source: news._source, outputs: [], clientSets: [], raw: [], runInfo: [] };
     items.push(record);
     console.log(`\n─── ${news.id} — ${news.headline}`);
     for (let run = 1; run <= opts.runs; run++) {
@@ -157,10 +172,25 @@ async function main() {
         failed = true;
         break;
       }
+      let retries = 0;
       try {
         callsUsed++;
         process.stdout.write(`  run ${run}/${opts.runs} (call ${callsUsed}/${opts.maxCalls})… `);
-        const returned = await analyzeImpact(news, holdingsSummary);
+        let returned;
+        for (;;) {
+          try {
+            returned = await analyzeImpact(news, holdingsSummary);
+            break;
+          } catch (err) {
+            // Transport failure: retry like production, if the cap allows.
+            if (!isTransportError(err) || retries >= TRANSPORT_RETRIES) throw err;
+            if (callsUsed >= opts.maxCalls) throw err;
+            retries++;
+            callsUsed++;
+            process.stdout.write(`transport retry ${retries} (call ${callsUsed}/${opts.maxCalls})… `);
+            await sleep(opts.delay);
+          }
+        }
         // The endpoint already normalized this; re-running is idempotent and
         // keeps the eval honest if it is ever pointed at a different server.
         const normalized = normalizeAgent1Output(returned, held.sectors, held.tickers);
@@ -168,9 +198,14 @@ async function main() {
         record.raw.push(returned);
         record.outputs.push(normalized);
         record.clientSets.push(clients.map((c) => c.clientId));
+        // Response size is what truncation is about — record it per run so a
+        // near-the-limit item is visible before it fails.
+        record.runInfo.push({ run, retries, responseChars: JSON.stringify(returned).length });
+        if (retries) notes.push(`${news.id}: run ${run} needed ${retries} transport retry/retries`);
         console.log(
           `scope=${normalized.event_scope ?? "-"} sentiment=${normalized.sentiment} ` +
-            `dislocation=${!!normalized.dislocation_detected} clients=${clients.length}`,
+            `dislocation=${!!normalized.dislocation_detected} clients=${clients.length} ` +
+            `chars=${JSON.stringify(returned).length}`,
         );
       } catch (err) {
         console.log("FAILED");
@@ -193,4 +228,5 @@ async function main() {
   }
 }
 
-await main();
+// Importable for unit tests (isTransportError); only runs when executed directly.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await main();

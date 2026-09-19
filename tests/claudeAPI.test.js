@@ -9,7 +9,12 @@
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 
-import { analyzeImpact, generateAllScripts, LIVE_MODE_DISABLED } from "../src/utils/claudeAPI.js";
+import {
+  analyzeImpact,
+  generateAllScripts,
+  LIVE_MODE_DISABLED,
+  RESPONSE_TRUNCATED,
+} from "../src/utils/claudeAPI.js";
 
 const realFetch = globalThis.fetch;
 let calls;
@@ -87,4 +92,15 @@ test("generateAllScripts carries length_exceeded only when the server set it", a
   assert.equal(out[0].length_exceeded, true);
   assert.equal(out[0].script, "long");
   assert.equal("length_exceeded" in out[1], false);
+});
+
+test("response_truncated: no retry, code surfaced, message explains the cut-off", async () => {
+  stubFetch(() => new Response(JSON.stringify({ error: RESPONSE_TRUNCATED }), { status: 502 }));
+  await assert.rejects(analyzeImpact({}, ""), (err) => {
+    assert.equal(err.status, 502);
+    assert.equal(err.code, RESPONSE_TRUNCATED);
+    assert.match(err.message, /ถูกตัดกลางคัน/);
+    return true;
+  });
+  assert.equal(calls, 1);
 });

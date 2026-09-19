@@ -26,7 +26,7 @@ import { DraftStatus } from "../hooks/useDraft.js";
 import { calculateImpactShare, isKeyAccount } from "../utils/matching.js";
 import { fetchLiveNews, isLiveNewsId } from "../utils/liveNews.js";
 import KeyAccountBadge from "./KeyAccountBadge.jsx";
-import { LIVE_MODE_DISABLED } from "../utils/claudeAPI.js";
+import { LIVE_MODE_DISABLED, RESPONSE_TRUNCATED } from "../utils/claudeAPI.js";
 import { cachedDemoRuns } from "../data/cachedDemoRun.js";
 
 // Preset items that resolve from the frozen cache (no API call). Derived from the
@@ -301,8 +301,31 @@ export default function NewsFeed({
           </section>
         )}
 
+        {/* The model's answer was cut off at its token budget. Not the user's
+            fault and not a bad news item — say so, and offer the retry (a
+            shorter answer may fit) rather than the generic failure card. */}
+        {status === DraftStatus.ERROR && errorCode === RESPONSE_TRUNCATED && (
+          <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+            <p className="text-sm font-semibold text-amber-800">
+              ผลวิเคราะห์ถูกตัดกลางคัน (เกินขีดจำกัดความยาวของโมเดล)
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-amber-700">
+              ระบบตรวจพบว่าคำตอบไม่สมบูรณ์จึงไม่นำไปใช้ต่อ — ไม่มีผลวิเคราะห์ที่ไม่ครบถ้วนเข้าสู่ขั้นตอนอนุมัติ
+              หากเกิดซ้ำ โปรดแจ้งผู้ดูแลระบบให้ขยายขีดจำกัด (max_tokens)
+            </p>
+            <button
+              onClick={handleAnalyze}
+              className="mt-3 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700"
+            >
+              ลองใหม่อีกครั้ง
+            </button>
+          </section>
+        )}
+
         {/* Error state */}
-        {status === DraftStatus.ERROR && errorCode !== LIVE_MODE_DISABLED && (
+        {status === DraftStatus.ERROR &&
+          errorCode !== LIVE_MODE_DISABLED &&
+          errorCode !== RESPONSE_TRUNCATED && (
           <section className="rounded-2xl border border-rose-200 bg-rose-50 p-5">
             <p className="text-sm font-semibold text-rose-700">
               การวิเคราะห์ล้มเหลว

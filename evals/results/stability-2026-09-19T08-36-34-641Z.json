@@ -1,0 +1,633 @@
+{
+  "model": "claude-sonnet-4-6",
+  "temperature": 0,
+  "runs": 5,
+  "startedAt": "2026-09-19T08:36:34.641Z",
+  "finishedAt": "2026-09-19T08:39:03.000Z",
+  "callsUsed": 4,
+  "endpoint": "http://127.0.0.1:51219",
+  "items": [
+    {
+      "newsId": "N007",
+      "headline": "Fed raises federal funds rate by 25 basis points to 3.75%-4.00%, first hike since July 2023",
+      "source": "src/data/mockNews.js",
+      "outputs": [
+        {
+          "affected_tickers": [
+            "BBL",
+            "KTB",
+            "DELTA",
+            "PTTEP"
+          ],
+          "affected_sectors": [
+            "banking",
+            "telecom",
+            "property",
+            "technology",
+            "transport"
+          ],
+          "sentiment": "negative",
+          "event_scope": "systemic",
+          "sector_impacts": [
+            {
+              "sector": "banking",
+              "direction": "positive",
+              "reason": "อัตราดอกเบี้ยที่สูงขึ้นช่วยขยาย net interest margin ของธนาคาร"
+            },
+            {
+              "sector": "telecom",
+              "direction": "negative",
+              "reason": "ดอกเบี้ยที่สูงขึ้นเพิ่มต้นทุนทางการเงินและกดดัน valuation ของหุ้น bond proxy อย่างกลุ่มโทรคมนาคม"
+            },
+            {
+              "sector": "property",
+              "direction": "negative",
+              "reason": "ดอกเบี้ยที่สูงขึ้นเพิ่มต้นทุนสินเชื่อที่อยู่อาศัยและกดดันกำลังซื้อของผู้บริโภค"
+            },
+            {
+              "sector": "energy",
+              "direction": "neutral",
+              "reason": "กลุ่มพลังงานได้รับผลกระทบจากดอกเบี้ยทางอ้อม แต่ราคาน้ำมันเป็นปัจจัยหลักที่ขับเคลื่อนรายได้ ซึ่งข่าวนี้ไม่ได้ระบุทิศทางราคาน้ำมันอย่างชัดเจน"
+            },
+            {
+              "sector": "technology",
+              "direction": "positive",
+              "reason": "ค่าเงินบาทที่อ่อนค่าลงหลังการขึ้นดอกเบี้ยของเฟดเป็นประโยชน์ต่อผู้ส่งออกอิเล็กทรอนิกส์ที่มีรายได้เป็นดอลลาร์"
+            },
+            {
+              "sector": "transport",
+              "direction": "negative",
+              "reason": "ดอกเบี้ยที่สูงขึ้นเพิ่มภาระต้นทุนทางการเงินของกลุ่มโครงสร้างพื้นฐานที่มีหนี้สูง"
+            },
+            {
+              "sector": "healthcare",
+              "direction": "neutral",
+              "reason": "กลุ่มสุขภาพมีความอ่อนไหวต่อดอกเบี้ยต่ำและมักทำหน้าที่เป็น defensive play ในภาวะที่มีความไม่แน่นอน"
+            }
+          ],
+          "dislocation_detected": true,
+          "dislocation_description": "ตามทฤษฎี การขึ้นดอกเบี้ยของเฟดควรกดดันตลาดหุ้นโดยรวม โดยเฉพาะกลุ่ม rate-sensitive เช่น property และ telecom และค่าเงินบาทควรอ่อนค่าลงตามส่วนต่างดอกเบี้ย อย่างไรก็ตาม ดัชนี SET กลับปรับขึ้น +1.32% ในวันถัดมา โดยนักวิเคราะห์ระบุว่าตลาดได้ปรับตัวสะท้อนทิศทางดอกเบี้ยไปก่อนหน้าแล้ว (priced in) ซึ่งสอดคล้องกับที่ข่าวระบุว่าตลาดส่วนใหญ่คาดการณ์การขึ้นดอกเบี้ยครั้งนี้ไว้ล่วงหน้า ที่น่าสังเกตคือ DELTA (technology/exporter) ปรับขึ้น +3.00% สูงสุดในกลุ่ม most active ซึ่งสอดคล้องกับบาทที่อ่อนค่า แต่ PTTEP กลับปรับลง -1.63% สวนทางกลุ่มพลังงานอื่น ดิสโลเคชันหลักคือการที่ตลาดโดยรวมปรับขึ้นแทนที่จะลงหลังการขึ้นดอกเบี้ย บ่งชี้ว่าตลาดตีความว่าความเสี่ยงขาลงถูก priced in ไปแล้ว และ dot plot ที่ส่งสัญญาณขึ้นดอกเบี้ยอีกครั้งยังคงเป็นปัจจัยความไม่แน่นอนที่อาจกดดันกลุ่ม rate-sensitive ในระยะถัดไป (ความเชื่อมั่นปานกลาง เนื่องจากการปรับขึ้นของตลาดอาจเป็นเพียง technical rebound มากกว่าการเปลี่ยนทิศทาง)",
+          "reasoning": "การขึ้นดอกเบี้ยของเฟดส่งผลเชิงระบบ (systemic) ต่อหลายกลุ่มอุตสาหกรรม: กลุ่มธนาคารได้ประโยชน์จาก NIM ที่กว้างขึ้น กลุ่ม telecom และ property ได้รับแรงกดดันจากต้นทุนทางการเงินที่สูงขึ้น ขณะที่บาทที่อ่อนค่าเป็นปัจจัยบวกต่อกลุ่ม technology exporter อย่าง DELTA และ KCE; dot plot ที่ส่งสัญญาณขึ้นดอกเบี้ยอีกครั้งในปี 2026 ยังคงเป็นความเสี่ยงที่ต้องติดตามสำหรับกลุ่ม rate-sensitive",
+          "normalization_notes": [
+            "นำ sector ที่เป็นกลาง (neutral) ออกจาก affected_sectors: energy, healthcare — ไม่ใช้จับคู่ลูกค้า"
+          ]
+        },
+        {
+          "affected_tickers": [
+            "BBL",
+            "KTB",
+            "DELTA",
+            "PTTEP"
+          ],
+          "affected_sectors": [
+            "banking",
+            "telecom",
+            "property",
+            "technology",
+            "transport"
+          ],
+          "sentiment": "negative",
+          "event_scope": "systemic",
+          "sector_impacts": [
+            {
+              "sector": "banking",
+              "direction": "positive",
+              "reason": "อัตราดอกเบี้ยที่สูงขึ้นช่วยขยาย net interest margin ของธนาคาร ส่งผลดีต่อรายได้ดอกเบี้ยสุทธิ"
+            },
+            {
+              "sector": "telecom",
+              "direction": "negative",
+              "reason": "กลุ่ม telecom เป็น bond proxy ที่มีภาระหนี้สูง ดอกเบี้ยที่ปรับขึ้นเพิ่มต้นทุนทางการเงินและกดดัน valuation"
+            },
+            {
+              "sector": "property",
+              "direction": "negative",
+              "reason": "ดอกเบี้ยที่สูงขึ้นเพิ่มต้นทุนสินเชื่อที่อยู่อาศัย กดดันกำลังซื้อและยอดขายโครงการ"
+            },
+            {
+              "sector": "energy",
+              "direction": "neutral",
+              "reason": "การขึ้นดอกเบี้ยของ Fed มักส่งผลให้ดอลลาร์แข็งค่าซึ่งกดดันราคาน้ำมัน แต่ผลกระทบต่อรายได้ขึ้นอยู่กับทิศทางราคาน้ำมันโลกเป็นหลัก"
+            },
+            {
+              "sector": "technology",
+              "direction": "positive",
+              "reason": "ค่าเงินบาทที่อ่อนค่าลงหลังการขึ้นดอกเบี้ยของ Fed เป็นประโยชน์ต่อผู้ส่งออกอิเล็กทรอนิกส์ที่มีรายได้เป็นดอลลาร์"
+            },
+            {
+              "sector": "transport",
+              "direction": "negative",
+              "reason": "ดอกเบี้ยที่สูงขึ้นเพิ่มภาระต้นทุนทางการเงินของธุรกิจโครงสร้างพื้นฐานที่มีหนี้สูง"
+            },
+            {
+              "sector": "healthcare",
+              "direction": "neutral",
+              "reason": "กลุ่ม healthcare มีความอ่อนไหวต่อดอกเบี้ยต่ำ มักทำหน้าที่เป็น defensive play ในภาวะที่มีความไม่แน่นอน"
+            }
+          ],
+          "dislocation_detected": true,
+          "dislocation_description": "ตามทฤษฎี การขึ้นดอกเบี้ยของ Fed ควรส่งผลลบต่อตลาดหุ้นโดยรวม โดยเฉพาะกลุ่ม property และ telecom ที่เป็น bond proxy และควรกดดัน sentiment ของนักลงทุน อย่างไรก็ตาม ดัชนี SET กลับปรับขึ้น +1.32% ในวันถัดมา โดยนักวิเคราะห์ระบุว่าตลาดได้ discount ทิศทางดอกเบี้ยไปก่อนหน้าแล้ว ทำให้เกิดแรงซื้อคืน (relief rally) หลังความไม่แน่นอนคลี่คลาย ที่น่าสังเกตคือ DELTA (+3.00%) ซึ่งเป็นผู้ส่งออกได้รับแรงหนุนจากบาทที่อ่อนค่า สอดคล้องกับทฤษฎี ขณะที่ PTTEP (-1.63%) ปรับลงสวนทางกับกลุ่มตลาด อาจสะท้อนความกังวลเรื่องดอลลาร์แข็งกดดันราคาน้ำมัน การที่ตลาดโดยรวมขึ้นสวนทางความคาดหวังเชิงลบบ่งชี้ว่าตลาดอาจมองว่าวัฏจักรดอกเบี้ยใกล้ถึงจุดสูงสุด แม้ dot plot จะส่งสัญญาณว่าอาจมีการขึ้นดอกเบี้ยอีกครั้ง ซึ่งเป็นความเสี่ยงที่ยังต้องติดตาม (ความเชื่อมั่นปานกลาง เนื่องจากตลาดได้ price in ล่วงหน้าแล้ว ทำให้ relief rally อธิบายได้บางส่วน)",
+          "reasoning": "การขึ้นดอกเบี้ย Fed 25 bps เป็นเหตุการณ์ systemic ที่ส่งผลผ่านหลายช่องทาง ได้แก่ (1) ดอกเบี้ยสูงขึ้น → บวกต่อ banking, ลบต่อ property/telecom/transport ที่มีภาระหนี้สูง (2) ดอลลาร์แข็งค่า/บาทอ่อน → บวกต่อ technology (ผู้ส่งออก) และกดดัน energy ผ่านราคาน้ำมัน dot plot ที่ส่งสัญญาณขึ้นดอกเบี้ยอีกครั้งยังคงเป็นปัจจัยความไม่แน่นอนที่ต้องติดตามต่อเนื่อง",
+          "normalization_notes": [
+            "นำ sector ที่เป็นกลาง (neutral) ออกจาก affected_sectors: energy, healthcare — ไม่ใช้จับคู่ลูกค้า"
+          ]
+        },
+        {
+          "affected_tickers": [
+            "BBL",
+            "KTB",
+            "DELTA",
+            "PTTEP"
+          ],
+          "affected_sectors": [
+            "banking",
+            "telecom",
+            "property",
+            "technology",
+            "transport"
+          ],
+          "sentiment": "negative",
+          "event_scope": "systemic",
+          "sector_impacts": [
+            {
+              "sector": "banking",
+              "direction": "positive",
+              "reason": "อัตราดอกเบี้ยที่สูงขึ้นช่วยขยาย net interest margin ของธนาคาร ส่งผลดีต่อรายได้ดอกเบี้ยสุทธิ"
+            },
+            {
+              "sector": "telecom",
+              "direction": "negative",
+              "reason": "กลุ่ม telecom เป็น bond proxy ที่มีภาระหนี้สูง ดอกเบี้ยที่ปรับขึ้นเพิ่มต้นทุนทางการเงินและกดดัน valuation"
+            },
+            {
+              "sector": "property",
+              "direction": "negative",
+              "reason": "ดอกเบี้ยที่สูงขึ้นเพิ่มต้นทุนสินเชื่อที่อยู่อาศัย กดดันกำลังซื้อและยอดขายโครงการ"
+            },
+            {
+              "sector": "energy",
+              "direction": "neutral",
+              "reason": "การขึ้นดอกเบี้ยของ Fed มักส่งผลให้ดอลลาร์แข็งค่าซึ่งกดดันราคาน้ำมัน แต่รายได้กลุ่มพลังงานยังขึ้นกับราคาน้ำมันโลกเป็นหลัก"
+            },
+            {
+              "sector": "technology",
+              "direction": "positive",
+              "reason": "ค่าเงินบาทที่อ่อนค่าลงหลังการขึ้นดอกเบี้ยของ Fed เป็นประโยชน์ต่อผู้ส่งออกอิเล็กทรอนิกส์ที่มีรายได้เป็นดอลลาร์"
+            },
+            {
+              "sector": "transport",
+              "direction": "negative",
+              "reason": "กลุ่ม transport ที่มีโครงสร้างหนี้สูงเผชิญต้นทุนทางการเงินที่เพิ่มขึ้นจากดอกเบี้ยที่ปรับสูงขึ้น"
+            },
+            {
+              "sector": "healthcare",
+              "direction": "neutral",
+              "reason": "กลุ่ม healthcare มีความอ่อนไหวต่อดอกเบี้ยต่ำ เนื่องจากเป็นหุ้น defensive ที่รายได้ไม่ผันผวนตามวัฏจักรเศรษฐกิจ"
+            }
+          ],
+          "dislocation_detected": true,
+          "dislocation_description": "ตามทฤษฎี การขึ้นดอกเบี้ยของ Fed ควรกดดันตลาดหุ้นโดยรวม โดยเฉพาะกลุ่ม bond proxy และ property ขณะที่ค่าเงินบาทควรอ่อนค่า อย่างไรก็ตาม ดัชนี SET กลับปรับขึ้น +1.32% ในวันถัดมา โดยนักวิเคราะห์ระบุว่าเป็นแรงซื้อคืนหลังตลาดได้ปรับตัวลงสะท้อนทิศทางดอกเบี้ยไปก่อนหน้าแล้ว ซึ่งสอดคล้องกับที่ตลาดได้ price in การขึ้นดอกเบี้ยครั้งนี้ไปเกือบทั้งหมดก่อนการประกาศ ที่น่าสังเกตคือ DELTA (+3.00%) ซึ่งเป็นผู้ส่งออกได้รับแรงหนุนจากบาทที่อ่อนค่า ขณะที่ PTTEP (-1.63%) ปรับลงสวนทางกลุ่มตลาด อาจสะท้อนความกังวลต่อแนวโน้มราคาน้ำมันภายใต้ดอลลาร์ที่แข็งค่า การที่ตลาดโดยรวมปรับขึ้นสวนทางความคาดหวังเชิงทฤษฎีอาจเป็นสัญญาณว่า sentiment ถูก price in ไปแล้ว และ dot plot ที่ส่งสัญญาณขึ้นดอกเบี้ยอีกครั้งยังคงเป็นปัจจัยเสี่ยงที่ต้องติดตาม (ความเชื่อมั่นปานกลาง เนื่องจากการขึ้นของตลาดมีคำอธิบายทางเลือกที่ชัดเจนจากการ price in ล่วงหน้า)",
+          "reasoning": "การขึ้นดอกเบี้ย Fed 25 bps เป็นเหตุการณ์ systemic ที่ส่งผลผ่านหลายช่องทาง ได้แก่ (1) ดอกเบี้ยที่สูงขึ้นเป็นบวกต่อ banking แต่เป็นลบต่อ telecom, property และ transport ที่มีภาระหนี้สูง (2) ค่าเงินบาทที่อ่อนค่าตาม dollar ที่แข็งค่าเป็นบวกต่อกลุ่ม technology ผู้ส่งออก แต่กดดันราคาน้ำมันซึ่งกระทบ energy; dot plot ที่ส่งสัญญาณขึ้นดอกเบี้ยอีกครั้งเพิ่มความไม่แน่นอนต่อทุกกลุ่มที่อ่อนไหวต่ออัตราดอกเบี้ย",
+          "normalization_notes": [
+            "นำ sector ที่เป็นกลาง (neutral) ออกจาก affected_sectors: energy, healthcare — ไม่ใช้จับคู่ลูกค้า"
+          ]
+        }
+      ],
+      "clientSets": [
+        [
+          "C006",
+          "C001",
+          "C007",
+          "C005",
+          "C008",
+          "C002",
+          "C003",
+          "C009",
+          "C010",
+          "C004"
+        ],
+        [
+          "C006",
+          "C001",
+          "C007",
+          "C005",
+          "C008",
+          "C002",
+          "C003",
+          "C009",
+          "C010",
+          "C004"
+        ],
+        [
+          "C006",
+          "C001",
+          "C007",
+          "C005",
+          "C008",
+          "C002",
+          "C003",
+          "C009",
+          "C010",
+          "C004"
+        ]
+      ],
+      "raw": [
+        {
+          "affected_tickers": [
+            "BBL",
+            "KTB",
+            "DELTA",
+            "PTTEP"
+          ],
+          "affected_sectors": [
+            "banking",
+            "telecom",
+            "property",
+            "technology",
+            "transport"
+          ],
+          "sentiment": "negative",
+          "event_scope": "systemic",
+          "sector_impacts": [
+            {
+              "sector": "banking",
+              "direction": "positive",
+              "reason": "อัตราดอกเบี้ยที่สูงขึ้นช่วยขยาย net interest margin ของธนาคาร"
+            },
+            {
+              "sector": "telecom",
+              "direction": "negative",
+              "reason": "ดอกเบี้ยที่สูงขึ้นเพิ่มต้นทุนทางการเงินและกดดัน valuation ของหุ้น bond proxy อย่างกลุ่มโทรคมนาคม"
+            },
+            {
+              "sector": "property",
+              "direction": "negative",
+              "reason": "ดอกเบี้ยที่สูงขึ้นเพิ่มต้นทุนสินเชื่อที่อยู่อาศัยและกดดันกำลังซื้อของผู้บริโภค"
+            },
+            {
+              "sector": "energy",
+              "direction": "neutral",
+              "reason": "กลุ่มพลังงานได้รับผลกระทบจากดอกเบี้ยทางอ้อม แต่ราคาน้ำมันเป็นปัจจัยหลักที่ขับเคลื่อนรายได้ ซึ่งข่าวนี้ไม่ได้ระบุทิศทางราคาน้ำมันอย่างชัดเจน"
+            },
+            {
+              "sector": "technology",
+              "direction": "positive",
+              "reason": "ค่าเงินบาทที่อ่อนค่าลงหลังการขึ้นดอกเบี้ยของเฟดเป็นประโยชน์ต่อผู้ส่งออกอิเล็กทรอนิกส์ที่มีรายได้เป็นดอลลาร์"
+            },
+            {
+              "sector": "transport",
+              "direction": "negative",
+              "reason": "ดอกเบี้ยที่สูงขึ้นเพิ่มภาระต้นทุนทางการเงินของกลุ่มโครงสร้างพื้นฐานที่มีหนี้สูง"
+            },
+            {
+              "sector": "healthcare",
+              "direction": "neutral",
+              "reason": "กลุ่มสุขภาพมีความอ่อนไหวต่อดอกเบี้ยต่ำและมักทำหน้าที่เป็น defensive play ในภาวะที่มีความไม่แน่นอน"
+            }
+          ],
+          "dislocation_detected": true,
+          "dislocation_description": "ตามทฤษฎี การขึ้นดอกเบี้ยของเฟดควรกดดันตลาดหุ้นโดยรวม โดยเฉพาะกลุ่ม rate-sensitive เช่น property และ telecom และค่าเงินบาทควรอ่อนค่าลงตามส่วนต่างดอกเบี้ย อย่างไรก็ตาม ดัชนี SET กลับปรับขึ้น +1.32% ในวันถัดมา โดยนักวิเคราะห์ระบุว่าตลาดได้ปรับตัวสะท้อนทิศทางดอกเบี้ยไปก่อนหน้าแล้ว (priced in) ซึ่งสอดคล้องกับที่ข่าวระบุว่าตลาดส่วนใหญ่คาดการณ์การขึ้นดอกเบี้ยครั้งนี้ไว้ล่วงหน้า ที่น่าสังเกตคือ DELTA (technology/exporter) ปรับขึ้น +3.00% สูงสุดในกลุ่ม most active ซึ่งสอดคล้องกับบาทที่อ่อนค่า แต่ PTTEP กลับปรับลง -1.63% สวนทางกลุ่มพลังงานอื่น ดิสโลเคชันหลักคือการที่ตลาดโดยรวมปรับขึ้นแทนที่จะลงหลังการขึ้นดอกเบี้ย บ่งชี้ว่าตลาดตีความว่าความเสี่ยงขาลงถูก priced in ไปแล้ว และ dot plot ที่ส่งสัญญาณขึ้นดอกเบี้ยอีกครั้งยังคงเป็นปัจจัยความไม่แน่นอนที่อาจกดดันกลุ่ม rate-sensitive ในระยะถัดไป (ความเชื่อมั่นปานกลาง เนื่องจากการปรับขึ้นของตลาดอาจเป็นเพียง technical rebound มากกว่าการเปลี่ยนทิศทาง)",
+          "reasoning": "การขึ้นดอกเบี้ยของเฟดส่งผลเชิงระบบ (systemic) ต่อหลายกลุ่มอุตสาหกรรม: กลุ่มธนาคารได้ประโยชน์จาก NIM ที่กว้างขึ้น กลุ่ม telecom และ property ได้รับแรงกดดันจากต้นทุนทางการเงินที่สูงขึ้น ขณะที่บาทที่อ่อนค่าเป็นปัจจัยบวกต่อกลุ่ม technology exporter อย่าง DELTA และ KCE; dot plot ที่ส่งสัญญาณขึ้นดอกเบี้ยอีกครั้งในปี 2026 ยังคงเป็นความเสี่ยงที่ต้องติดตามสำหรับกลุ่ม rate-sensitive",
+          "normalization_notes": [
+            "นำ sector ที่เป็นกลาง (neutral) ออกจาก affected_sectors: energy, healthcare — ไม่ใช้จับคู่ลูกค้า"
+          ]
+        },
+        {
+          "affected_tickers": [
+            "BBL",
+            "KTB",
+            "DELTA",
+            "PTTEP"
+          ],
+          "affected_sectors": [
+            "banking",
+            "telecom",
+            "property",
+            "technology",
+            "transport"
+          ],
+          "sentiment": "negative",
+          "event_scope": "systemic",
+          "sector_impacts": [
+            {
+              "sector": "banking",
+              "direction": "positive",
+              "reason": "อัตราดอกเบี้ยที่สูงขึ้นช่วยขยาย net interest margin ของธนาคาร ส่งผลดีต่อรายได้ดอกเบี้ยสุทธิ"
+            },
+            {
+              "sector": "telecom",
+              "direction": "negative",
+              "reason": "กลุ่ม telecom เป็น bond proxy ที่มีภาระหนี้สูง ดอกเบี้ยที่ปรับขึ้นเพิ่มต้นทุนทางการเงินและกดดัน valuation"
+            },
+            {
+              "sector": "property",
+              "direction": "negative",
+              "reason": "ดอกเบี้ยที่สูงขึ้นเพิ่มต้นทุนสินเชื่อที่อยู่อาศัย กดดันกำลังซื้อและยอดขายโครงการ"
+            },
+            {
+              "sector": "energy",
+              "direction": "neutral",
+              "reason": "การขึ้นดอกเบี้ยของ Fed มักส่งผลให้ดอลลาร์แข็งค่าซึ่งกดดันราคาน้ำมัน แต่ผลกระทบต่อรายได้ขึ้นอยู่กับทิศทางราคาน้ำมันโลกเป็นหลัก"
+            },
+            {
+              "sector": "technology",
+              "direction": "positive",
+              "reason": "ค่าเงินบาทที่อ่อนค่าลงหลังการขึ้นดอกเบี้ยของ Fed เป็นประโยชน์ต่อผู้ส่งออกอิเล็กทรอนิกส์ที่มีรายได้เป็นดอลลาร์"
+            },
+            {
+              "sector": "transport",
+              "direction": "negative",
+              "reason": "ดอกเบี้ยที่สูงขึ้นเพิ่มภาระต้นทุนทางการเงินของธุรกิจโครงสร้างพื้นฐานที่มีหนี้สูง"
+            },
+            {
+              "sector": "healthcare",
+              "direction": "neutral",
+              "reason": "กลุ่ม healthcare มีความอ่อนไหวต่อดอกเบี้ยต่ำ มักทำหน้าที่เป็น defensive play ในภาวะที่มีความไม่แน่นอน"
+            }
+          ],
+          "dislocation_detected": true,
+          "dislocation_description": "ตามทฤษฎี การขึ้นดอกเบี้ยของ Fed ควรส่งผลลบต่อตลาดหุ้นโดยรวม โดยเฉพาะกลุ่ม property และ telecom ที่เป็น bond proxy และควรกดดัน sentiment ของนักลงทุน อย่างไรก็ตาม ดัชนี SET กลับปรับขึ้น +1.32% ในวันถัดมา โดยนักวิเคราะห์ระบุว่าตลาดได้ discount ทิศทางดอกเบี้ยไปก่อนหน้าแล้ว ทำให้เกิดแรงซื้อคืน (relief rally) หลังความไม่แน่นอนคลี่คลาย ที่น่าสังเกตคือ DELTA (+3.00%) ซึ่งเป็นผู้ส่งออกได้รับแรงหนุนจากบาทที่อ่อนค่า สอดคล้องกับทฤษฎี ขณะที่ PTTEP (-1.63%) ปรับลงสวนทางกับกลุ่มตลาด อาจสะท้อนความกังวลเรื่องดอลลาร์แข็งกดดันราคาน้ำมัน การที่ตลาดโดยรวมขึ้นสวนทางความคาดหวังเชิงลบบ่งชี้ว่าตลาดอาจมองว่าวัฏจักรดอกเบี้ยใกล้ถึงจุดสูงสุด แม้ dot plot จะส่งสัญญาณว่าอาจมีการขึ้นดอกเบี้ยอีกครั้ง ซึ่งเป็นความเสี่ยงที่ยังต้องติดตาม (ความเชื่อมั่นปานกลาง เนื่องจากตลาดได้ price in ล่วงหน้าแล้ว ทำให้ relief rally อธิบายได้บางส่วน)",
+          "reasoning": "การขึ้นดอกเบี้ย Fed 25 bps เป็นเหตุการณ์ systemic ที่ส่งผลผ่านหลายช่องทาง ได้แก่ (1) ดอกเบี้ยสูงขึ้น → บวกต่อ banking, ลบต่อ property/telecom/transport ที่มีภาระหนี้สูง (2) ดอลลาร์แข็งค่า/บาทอ่อน → บวกต่อ technology (ผู้ส่งออก) และกดดัน energy ผ่านราคาน้ำมัน dot plot ที่ส่งสัญญาณขึ้นดอกเบี้ยอีกครั้งยังคงเป็นปัจจัยความไม่แน่นอนที่ต้องติดตามต่อเนื่อง",
+          "normalization_notes": [
+            "นำ sector ที่เป็นกลาง (neutral) ออกจาก affected_sectors: energy, healthcare — ไม่ใช้จับคู่ลูกค้า"
+          ]
+        },
+        {
+          "affected_tickers": [
+            "BBL",
+            "KTB",
+            "DELTA",
+            "PTTEP"
+          ],
+          "affected_sectors": [
+            "banking",
+            "telecom",
+            "property",
+            "technology",
+            "transport"
+          ],
+          "sentiment": "negative",
+          "event_scope": "systemic",
+          "sector_impacts": [
+            {
+              "sector": "banking",
+              "direction": "positive",
+              "reason": "อัตราดอกเบี้ยที่สูงขึ้นช่วยขยาย net interest margin ของธนาคาร ส่งผลดีต่อรายได้ดอกเบี้ยสุทธิ"
+            },
+            {
+              "sector": "telecom",
+              "direction": "negative",
+              "reason": "กลุ่ม telecom เป็น bond proxy ที่มีภาระหนี้สูง ดอกเบี้ยที่ปรับขึ้นเพิ่มต้นทุนทางการเงินและกดดัน valuation"
+            },
+            {
+              "sector": "property",
+              "direction": "negative",
+              "reason": "ดอกเบี้ยที่สูงขึ้นเพิ่มต้นทุนสินเชื่อที่อยู่อาศัย กดดันกำลังซื้อและยอดขายโครงการ"
+            },
+            {
+              "sector": "energy",
+              "direction": "neutral",
+              "reason": "การขึ้นดอกเบี้ยของ Fed มักส่งผลให้ดอลลาร์แข็งค่าซึ่งกดดันราคาน้ำมัน แต่รายได้กลุ่มพลังงานยังขึ้นกับราคาน้ำมันโลกเป็นหลัก"
+            },
+            {
+              "sector": "technology",
+              "direction": "positive",
+              "reason": "ค่าเงินบาทที่อ่อนค่าลงหลังการขึ้นดอกเบี้ยของ Fed เป็นประโยชน์ต่อผู้ส่งออกอิเล็กทรอนิกส์ที่มีรายได้เป็นดอลลาร์"
+            },
+            {
+              "sector": "transport",
+              "direction": "negative",
+              "reason": "กลุ่ม transport ที่มีโครงสร้างหนี้สูงเผชิญต้นทุนทางการเงินที่เพิ่มขึ้นจากดอกเบี้ยที่ปรับสูงขึ้น"
+            },
+            {
+              "sector": "healthcare",
+              "direction": "neutral",
+              "reason": "กลุ่ม healthcare มีความอ่อนไหวต่อดอกเบี้ยต่ำ เนื่องจากเป็นหุ้น defensive ที่รายได้ไม่ผันผวนตามวัฏจักรเศรษฐกิจ"
+            }
+          ],
+          "dislocation_detected": true,
+          "dislocation_description": "ตามทฤษฎี การขึ้นดอกเบี้ยของ Fed ควรกดดันตลาดหุ้นโดยรวม โดยเฉพาะกลุ่ม bond proxy และ property ขณะที่ค่าเงินบาทควรอ่อนค่า อย่างไรก็ตาม ดัชนี SET กลับปรับขึ้น +1.32% ในวันถัดมา โดยนักวิเคราะห์ระบุว่าเป็นแรงซื้อคืนหลังตลาดได้ปรับตัวลงสะท้อนทิศทางดอกเบี้ยไปก่อนหน้าแล้ว ซึ่งสอดคล้องกับที่ตลาดได้ price in การขึ้นดอกเบี้ยครั้งนี้ไปเกือบทั้งหมดก่อนการประกาศ ที่น่าสังเกตคือ DELTA (+3.00%) ซึ่งเป็นผู้ส่งออกได้รับแรงหนุนจากบาทที่อ่อนค่า ขณะที่ PTTEP (-1.63%) ปรับลงสวนทางกลุ่มตลาด อาจสะท้อนความกังวลต่อแนวโน้มราคาน้ำมันภายใต้ดอลลาร์ที่แข็งค่า การที่ตลาดโดยรวมปรับขึ้นสวนทางความคาดหวังเชิงทฤษฎีอาจเป็นสัญญาณว่า sentiment ถูก price in ไปแล้ว และ dot plot ที่ส่งสัญญาณขึ้นดอกเบี้ยอีกครั้งยังคงเป็นปัจจัยเสี่ยงที่ต้องติดตาม (ความเชื่อมั่นปานกลาง เนื่องจากการขึ้นของตลาดมีคำอธิบายทางเลือกที่ชัดเจนจากการ price in ล่วงหน้า)",
+          "reasoning": "การขึ้นดอกเบี้ย Fed 25 bps เป็นเหตุการณ์ systemic ที่ส่งผลผ่านหลายช่องทาง ได้แก่ (1) ดอกเบี้ยที่สูงขึ้นเป็นบวกต่อ banking แต่เป็นลบต่อ telecom, property และ transport ที่มีภาระหนี้สูง (2) ค่าเงินบาทที่อ่อนค่าตาม dollar ที่แข็งค่าเป็นบวกต่อกลุ่ม technology ผู้ส่งออก แต่กดดันราคาน้ำมันซึ่งกระทบ energy; dot plot ที่ส่งสัญญาณขึ้นดอกเบี้ยอีกครั้งเพิ่มความไม่แน่นอนต่อทุกกลุ่มที่อ่อนไหวต่ออัตราดอกเบี้ย",
+          "normalization_notes": [
+            "นำ sector ที่เป็นกลาง (neutral) ออกจาก affected_sectors: energy, healthcare — ไม่ใช้จับคู่ลูกค้า"
+          ]
+        }
+      ],
+      "runInfo": [
+        {
+          "run": 1,
+          "retries": 0,
+          "responseChars": 2708
+        },
+        {
+          "run": 2,
+          "retries": 0,
+          "responseChars": 2637
+        },
+        {
+          "run": 3,
+          "retries": 0,
+          "responseChars": 2703
+        }
+      ],
+      "error": "Agent \"impact\" request failed (502): invalid_model_output"
+    }
+  ],
+  "metrics": [
+    {
+      "newsId": "N007",
+      "runs": 3,
+      "eventScope": {
+        "value": "systemic",
+        "count": 3,
+        "runs": 3,
+        "share": 1,
+        "distribution": {
+          "systemic": 3
+        }
+      },
+      "sentiment": {
+        "value": "negative",
+        "count": 3,
+        "runs": 3,
+        "share": 1,
+        "distribution": {
+          "negative": 3
+        }
+      },
+      "dislocation": {
+        "detectedRuns": 3,
+        "detectedShare": 1,
+        "agreementShare": 1
+      },
+      "sectors": {
+        "banking": {
+          "listedRuns": 3,
+          "listedShare": 1,
+          "matchingRuns": 3,
+          "matchingShare": 1,
+          "directionCounts": {
+            "positive": 3,
+            "negative": 0,
+            "neutral": 0
+          },
+          "modalDirection": "positive",
+          "modalDirectionShare": 1,
+          "flipped": false
+        },
+        "energy": {
+          "listedRuns": 3,
+          "listedShare": 1,
+          "matchingRuns": 0,
+          "matchingShare": 0,
+          "directionCounts": {
+            "positive": 0,
+            "negative": 0,
+            "neutral": 3
+          },
+          "modalDirection": "neutral",
+          "modalDirectionShare": 1,
+          "flipped": false
+        },
+        "healthcare": {
+          "listedRuns": 3,
+          "listedShare": 1,
+          "matchingRuns": 0,
+          "matchingShare": 0,
+          "directionCounts": {
+            "positive": 0,
+            "negative": 0,
+            "neutral": 3
+          },
+          "modalDirection": "neutral",
+          "modalDirectionShare": 1,
+          "flipped": false
+        },
+        "property": {
+          "listedRuns": 3,
+          "listedShare": 1,
+          "matchingRuns": 3,
+          "matchingShare": 1,
+          "directionCounts": {
+            "positive": 0,
+            "negative": 3,
+            "neutral": 0
+          },
+          "modalDirection": "negative",
+          "modalDirectionShare": 1,
+          "flipped": false
+        },
+        "technology": {
+          "listedRuns": 3,
+          "listedShare": 1,
+          "matchingRuns": 3,
+          "matchingShare": 1,
+          "directionCounts": {
+            "positive": 3,
+            "negative": 0,
+            "neutral": 0
+          },
+          "modalDirection": "positive",
+          "modalDirectionShare": 1,
+          "flipped": false
+        },
+        "telecom": {
+          "listedRuns": 3,
+          "listedShare": 1,
+          "matchingRuns": 3,
+          "matchingShare": 1,
+          "directionCounts": {
+            "positive": 0,
+            "negative": 3,
+            "neutral": 0
+          },
+          "modalDirection": "negative",
+          "modalDirectionShare": 1,
+          "flipped": false
+        },
+        "transport": {
+          "listedRuns": 3,
+          "listedShare": 1,
+          "matchingRuns": 3,
+          "matchingShare": 1,
+          "directionCounts": {
+            "positive": 0,
+            "negative": 3,
+            "neutral": 0
+          },
+          "modalDirection": "negative",
+          "modalDirectionShare": 1,
+          "flipped": false
+        }
+      },
+      "tickers": {
+        "meanCount": 4,
+        "minCount": 4,
+        "maxCount": 4,
+        "always": [
+          "BBL",
+          "DELTA",
+          "KTB",
+          "PTTEP"
+        ],
+        "sometimes": []
+      },
+      "clients": {
+        "runs": 3,
+        "identicalSetShare": 1,
+        "distinctSets": 1,
+        "meanCount": 10,
+        "perClient": {
+          "C001": {
+            "runs": 3,
+            "share": 1
+          },
+          "C002": {
+            "runs": 3,
+            "share": 1
+          },
+          "C003": {
+            "runs": 3,
+            "share": 1
+          },
+          "C004": {
+            "runs": 3,
+            "share": 1
+          },
+          "C005": {
+            "runs": 3,
+            "share": 1
+          },
+          "C006": {
+            "runs": 3,
+            "share": 1
+          },
+          "C007": {
+            "runs": 3,
+            "share": 1
+          },
+          "C008": {
+            "runs": 3,
+            "share": 1
+          },
+          "C009": {
+            "runs": 3,
+            "share": 1
+          },
+          "C010": {
+            "runs": 3,
+            "share": 1
+          }
+        }
+      },
+      "stabilityScore": 1,
+      "flippedSectors": [],
+      "headline": "Fed raises federal funds rate by 25 basis points to 3.75%-4.00%, first hike since July 2023",
+      "error": "Agent \"impact\" request failed (502): invalid_model_output",
+      "incomplete": true
+    }
+  ],
+  "notes": [
+    "N007: run 4 failed — Agent \"impact\" request failed (502): invalid_model_output"
+  ]
+}

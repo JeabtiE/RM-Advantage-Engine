@@ -4,7 +4,7 @@
 - **Temperature:** 0
 - **Runs per item (N):** 5
 - **Date:** 2026-09-19T08:21:11.303Z
-- **Real Anthropic calls:** 9
+- **Real Anthropic calls:** 13
 
 > These numbers are a snapshot of ONE session. They are not a guarantee of
 > future behaviour, not a benchmark, and not a quality judgement: the model
@@ -12,9 +12,13 @@
 > stability score is the mean of the modal-agreement shares below — a rough
 > indicator for spotting which item moved most, nothing more.
 
-> ⚠️ N007: run 1 failed — Agent "impact" request failed (502): invalid_model_output
+> ⚠️ N006 and EVAL-CPN were measured at 2026-09-19T08:21:11.303Z (9 calls), BEFORE the Agent 1 max_tokens fix.
 
-> ⚠️ EVAL-CPN: run 3 failed — Agent "impact" request failed (502): upstream_error
+> ⚠️ N007 was measured separately at 2026-09-19T08:36:34.641Z (4 calls), AFTER raising Agent 1 to 6144 tokens (Phase 5b.1). Its earlier attempt failed outright: the 2048-token budget cut the JSON mid-word.
+
+> ⚠️ EVAL-CPN stopped after 2 runs on a transport failure that the eval harness did not retry; the runner now retries transport failures like production does.
+
+> ⚠️ N007 completed 3 of 5 runs: run 4 returned MALFORMED (not truncated) JSON — the model wrote an unescaped double quote inside a Thai string (…เป็น "buy the fact" มากกว่า…), which JSON.parse rejects. That is a separate, unfixed issue.
 
 ## N006 — ทรัมป์ประกาศขึ้นภาษีนำเข้าทั่วโลก ตลาดการเงินผันผวนหนัก
 
@@ -53,12 +57,6 @@ Runs: 5 · stability score: **100%** (rough indicator)
 | C009 | 5/5 |
 | C010 | 5/5 |
 
-## N007 — Fed raises federal funds rate by 25 basis points to 3.75%-4.00%, first hike since July 2023
-
-**Incomplete:** Agent "impact" request failed (502): invalid_model_output
-
-No run completed, so there is nothing to measure.
-
 ## EVAL-CPN — Central Pattana and Mitsubishi Estate announce $330m mixed-use project
 
 **Incomplete:** Agent "impact" request failed (502): upstream_error
@@ -85,3 +83,44 @@ Runs: 2 · stability score: **100%** (rough indicator)
 |---|---|
 | C003 | 2/2 |
 | C007 | 2/2 |
+
+## N007 — Fed raises federal funds rate by 25 basis points to 3.75%-4.00%, first hike since July 2023
+
+**Incomplete:** Agent "impact" request failed (502): invalid_model_output
+
+Metrics below cover the 3 completed run(s) only — treat them as indicative.
+
+Runs: 3 · stability score: **100%** (rough indicator)
+
+| Field | Modal value | Agreement | Distribution |
+|---|---|---|---|
+| event_scope | `systemic` | 100% | systemic: 3 |
+| sentiment | `negative` | 100% | negative: 3 |
+| dislocation_detected | `true` | 100% | detected in 3/3 |
+
+| Sector | Listed in | Used for matching | positive / negative / neutral | Modal | Flipped |
+|---|---|---|---|---|---|
+| banking | 3/3 | 3/3 | 3 / 0 / 0 | positive (100%) | no |
+| energy | 3/3 | 0/3 | 0 / 0 / 3 | neutral (100%) | no |
+| healthcare | 3/3 | 0/3 | 0 / 0 / 3 | neutral (100%) | no |
+| property | 3/3 | 3/3 | 0 / 3 / 0 | negative (100%) | no |
+| technology | 3/3 | 3/3 | 3 / 0 / 0 | positive (100%) | no |
+| telecom | 3/3 | 3/3 | 0 / 3 / 0 | negative (100%) | no |
+| transport | 3/3 | 3/3 | 0 / 3 / 0 | negative (100%) | no |
+
+**affected_tickers:** mean 4.0 (min 4, max 4) · every run: BBL, DELTA, KTB, PTTEP · some runs: —
+
+**Matched clients:** mean 10.0 · identical client set in 100% of runs · 1 distinct set(s)
+
+| Client | Matched in |
+|---|---|
+| C001 | 3/3 |
+| C002 | 3/3 |
+| C003 | 3/3 |
+| C004 | 3/3 |
+| C005 | 3/3 |
+| C006 | 3/3 |
+| C007 | 3/3 |
+| C008 | 3/3 |
+| C009 | 3/3 |
+| C010 | 3/3 |
