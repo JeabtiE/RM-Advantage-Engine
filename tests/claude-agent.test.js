@@ -662,6 +662,131 @@ test("upstream 4xx body is not returned to the caller", async () => {
   assert.deepEqual(out.body, { error: "upstream_error" });
 });
 
+test("every agent prompt forbids raw double quotes inside JSON strings, with the observed example", async () => {
+  for (const body of [
+    impactBody(),
+    { agent: "factcheck", news: n006, agent1Output: n006Run.analysis },
+    { agent: "script", analysis: n006Run.analysis, client: n006Run.affectedClients[0] },
+  ]) {
+    const prompt = await systemPromptFor(body);
+    assert.match(prompt, /JSON VALIDITY/, body.agent);
+    assert.match(prompt, /Never put a raw double quote \("\) inside a string value/, body.agent);
+    assert.match(prompt, /Thai quotation marks \(“ ”\)/, body.agent);
+    assert.match(prompt, /escape it as \\"/, body.agent);
+    // The exact failure seen live on 2026-09-19, with its corrected form.
+    assert.match(prompt, /WRONG: .*buy the fact.* -> {2}RIGHT: .*“buy the fact”/, body.agent);
+    assert.match(prompt, /No trailing commas/, body.agent);
+  }
+});
+
+// Sequenced stub: one canned response per call, so a retry gets the next one.
+function respondInOrder(...bodies) {
+  let i = 0;
+  fetchResponder = () => {
+    const b = bodies[Math.min(i++, bodies.length - 1)];
+    return typeof b === "function" ? b() : b;
+  };
+}
+const badJson = () =>
+  new Response(
+    JSON.stringify({
+      content: [{ type: "text", text: '{"sentiment": "negative", "reasoning": "เป็น "buy the fact" มากกว่า"}' }],
+    }),
+    { status: 200 },
+  );
+
+test("malformed JSON then valid -> success after exactly one parse retry", async () => {
+  respondInOrder(badJson, () => anthropicOk({ script: "เรียนคุณทดสอบ" }));
+  const out = await call({
+    body: { agent: "script", analysis: n006Run.analysis, client: n006Run.affectedClients[0] },
+  });
+  assert.equal(out.status, 200);
+  assert.equal(out.body.script, "เรียนคุณทดสอบ");
+  assert.equal(fetchCalls.length, 2, "one original call + one parse retry");
+});
+
+test("malformed JSON twice -> invalid_model_output, and no third attempt", async () => {
+  respondInOrder(badJson, badJson, () => anthropicOk({ ok: true }));
+  const out = await call({ body: impactBody() });
+  assert.equal(out.status, 502);
+  assert.deepEqual(out.body, { error: "invalid_model_output" });
+  assert.equal(fetchCalls.length, 2, "parse retry happens once, not repeatedly");
+});
+
+test("a 429 and a parse failure in one call do not stack retry budgets", async () => {
+  // 429 -> transport retry (inside callClaude) -> malformed -> ONE parse retry
+  // -> valid. Four fetches total: the parse retry must not restart the
+  // transport budget, and the transport retry must not re-trigger parsing.
+  respondInOrder(
+    () => new Response("{}", { status: 429 }),
+    badJson,
+    () => new Response("{}", { status: 429 }),
+    () => anthropicOk({ ok: true }),
+  );
+  const out = await call({ body: impactBody() });
+  assert.equal(out.status, 200);
+  assert.equal(fetchCalls.length, 4);
+});
+
+test("stop_reason max_tokens -> response_truncated, and the cut JSON is never parsed", async () => {
+  // A truncated answer is still valid-looking JSON up to the cut, so the old
+  // code blamed the model's formatting (invalid_model_output). The truncation
+  // check must run BEFORE parseAIResponse.
+  const cut = '{"affected_tickers": ["BBL"], "affected_sectors": ["banking", "telec';
+  for (const agent of [
+    impactBody(),
+    { agent: "factcheck", news: n006, agent1Output: n006Run.analysis },
+    { agent: "script", analysis: n006Run.analysis, client: n006Run.affectedClients[0] },
+  ]) {
+    fetchCalls = [];
+    fetchResponder = () =>
+      new Response(JSON.stringify({ stop_reason: "max_tokens", content: [{ type: "text", text: cut }] }), {
+        status: 200,
+      });
+    const out = await call({ body: agent });
+    assert.equal(out.status, 502, agent.agent);
+    assert.deepEqual(out.body, { error: "response_truncated" }, agent.agent);
+    // Not retryable: the same request would truncate again.
+    assert.equal(fetchCalls.length, 1, agent.agent);
+  }
+});
+
+test("a complete response with stop_reason end_turn is unaffected", async () => {
+  fetchResponder = () =>
+    new Response(
+      JSON.stringify({
+        stop_reason: "end_turn",
+        content: [{ type: "text", text: JSON.stringify({ script: "เรียนคุณทดสอบ" }) }],
+      }),
+      { status: 200 },
+    );
+  const out = await call({
+    body: { agent: "script", analysis: n006Run.analysis, client: n006Run.affectedClients[0] },
+  });
+  assert.equal(out.status, 200);
+  assert.equal(out.body.script, "เรียนคุณทดสอบ");
+});
+
+test("per-agent max_tokens: Agent 1 > Agent 2 > Agent 3, sized above observed responses", async () => {
+  const sent = {};
+  for (const [name, body] of [
+    ["impact", impactBody()],
+    ["factcheck", { agent: "factcheck", news: n006, agent1Output: n006Run.analysis }],
+    ["script", { agent: "script", analysis: n006Run.analysis, client: n006Run.affectedClients[0] }],
+  ]) {
+    fetchCalls = [];
+    fetchResponder = () => anthropicOk(name === "script" ? { script: "ok" } : { ok: true });
+    await call({ body });
+    sent[name] = JSON.parse(fetchCalls[0].init.body).max_tokens;
+  }
+  assert.equal(sent.impact, 6144);
+  assert.equal(sent.factcheck, 4096);
+  assert.equal(sent.script, 1024, "Agent 3 unchanged");
+  // Agent 1 must clear the truncation seen in the eval (3,006 chars emitted at
+  // 2048 tokens) with real headroom.
+  assert.ok(sent.impact >= 2048 * 2);
+});
+
 test("unparseable model output is not returned to the caller", async () => {
   fetchResponder = () =>
     new Response(JSON.stringify({ content: [{ type: "text", text: "RAW MODEL TEXT not json" }] }), {

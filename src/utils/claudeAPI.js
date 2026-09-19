@@ -46,6 +46,15 @@ const LIVE_MODE_DISABLED_MESSAGE =
   "การวิเคราะห์สด (live analysis) ปิดอยู่บนเดโมสาธารณะ — " +
   "ข่าวที่มีผลวิเคราะห์สำรองไว้ (cached demo) ยังใช้งานได้ตามปกติ";
 
+// The model hit its output-token budget and the JSON came back cut off. Distinct
+// from a malformed response: nothing is wrong with the news or the prompt, and
+// retrying the same request would truncate again (the endpoint does not retry it).
+export const RESPONSE_TRUNCATED = "response_truncated";
+
+const RESPONSE_TRUNCATED_MESSAGE =
+  "ผลวิเคราะห์ยาวเกินขีดจำกัดของโมเดล จึงถูกตัดกลางคัน — " +
+  "ระบบไม่ได้ใช้ผลที่ไม่สมบูรณ์ โปรดลองใหม่หรือแจ้งผู้ดูแลระบบให้ขยายขีดจำกัด";
+
 // postAgent — single POST to /api/claude-agent for one agent. The endpoint owns
 // the Anthropic retry/backoff (max 2, 429 → 10s); we do NOT re-retry an HTTP
 // error here or the two backoffs would stack — every non-2xx (4xx, 503 kill
@@ -82,7 +91,9 @@ async function postAgent(agent, payload) {
         const message =
           code === LIVE_MODE_DISABLED
             ? LIVE_MODE_DISABLED_MESSAGE
-            : `Agent "${agent}" request failed (${res.status})${code ? `: ${code}` : ""}`;
+            : code === RESPONSE_TRUNCATED
+              ? RESPONSE_TRUNCATED_MESSAGE
+              : `Agent "${agent}" request failed (${res.status})${code ? `: ${code}` : ""}`;
         throw Object.assign(new Error(message), { status: res.status, code });
       }
 

@@ -1,0 +1,1025 @@
+{
+  "model": "claude-sonnet-4-6",
+  "temperature": 0,
+  "runs": 5,
+  "startedAt": "2026-09-19T08:21:11.303Z",
+  "finishedAt": "2026-09-19T08:25:52.824Z",
+  "callsUsed": 9,
+  "endpoint": "http://127.0.0.1:59351",
+  "items": [
+    {
+      "newsId": "N006",
+      "headline": "ทรัมป์ประกาศขึ้นภาษีนำเข้าทั่วโลก ตลาดการเงินผันผวนหนัก",
+      "source": "src/data/mockNews.js",
+      "outputs": [
+        {
+          "affected_tickers": [],
+          "affected_sectors": [
+            "banking",
+            "telecom",
+            "technology",
+            "energy",
+            "property",
+            "transport"
+          ],
+          "sentiment": "negative",
+          "event_scope": "systemic",
+          "sector_impacts": [
+            {
+              "sector": "banking",
+              "direction": "negative",
+              "reason": "ภาวะ risk-off และความผันผวนของตลาดการเงินกดดันความเชื่อมั่นและอาจชะลอสินเชื่อในภาคธุรกิจที่พึ่งพาการค้าระหว่างประเทศ"
+            },
+            {
+              "sector": "telecom",
+              "direction": "negative",
+              "reason": "กลุ่ม telecom เป็น bond proxy ที่อ่อนไหวต่อภาวะตลาดผันผวน และการขายพันธบัตรสหรัฐสวนทางทฤษฎีสร้างความไม่แน่นอนต่อต้นทุนการกู้ยืม"
+            },
+            {
+              "sector": "healthcare",
+              "direction": "neutral",
+              "reason": "กลุ่มสุขภาพมีลักษณะ defensive ต่อแรงกดดันมหภาค แต่ภาวะ risk-off รุนแรงอาจกดดันราคาหุ้นในระยะสั้นจากแรงขายทั่วตลาด"
+            },
+            {
+              "sector": "technology",
+              "direction": "negative",
+              "reason": "กลุ่มส่งออกอิเล็กทรอนิกส์อย่าง DELTA, KCE และ HANA ได้รับผลกระทบโดยตรงจากภาษีนำเข้าที่สูงขึ้น ซึ่งกระทบห่วงโซ่อุปทานและต้นทุนการส่งออก"
+            },
+            {
+              "sector": "energy",
+              "direction": "negative",
+              "reason": "ความกังวลต่อการชะลอตัวของเศรษฐกิจโลกจากมาตรการภาษีกดดันอุปสงค์น้ำมันและราคาพลังงาน ซึ่งส่งผลลบต่อรายได้กลุ่มพลังงาน"
+            },
+            {
+              "sector": "property",
+              "direction": "negative",
+              "reason": "ภาวะตลาดผันผวนและความไม่แน่นอนทางเศรษฐกิจกดดันความเชื่อมั่นผู้บริโภคและการตัดสินใจซื้ออสังหาริมทรัพย์"
+            },
+            {
+              "sector": "transport",
+              "direction": "negative",
+              "reason": "ภาวะ risk-off และการชะลอตัวของการค้าโลกกดดันปริมาณการเดินทางและโลจิสติกส์ ส่งผลลบต่อกลุ่มขนส่ง"
+            }
+          ],
+          "dislocation_detected": true,
+          "dislocation_description": "ในภาวะ risk-off จากการประกาศขึ้นภาษีนำเข้า ทองคำและพันธบัตรสหรัฐควรปรับตัวขึ้นตามทฤษฎีการไหลเข้าสู่สินทรัพย์ปลอดภัย แต่ในความเป็นจริงทองคำกลับปรับลง 2.3% และพันธบัตรสหรัฐถูกขายออกพร้อมกัน ซึ่งสวนทางกับที่ควรเป็นอย่างชัดเจน รูปแบบนี้บ่งชี้ว่าแรงขายน่าจะมาจากการเพิ่มสภาพคล่องฉุกเฉิน (dash for cash / margin call) มากกว่าการปรับพอร์ตตามปัจจัยพื้นฐาน การที่ทองคำร่วงสวนทาง risk-off อาจสะท้อนการ mispricing ชั่วคราว และอาจเป็นโอกาสสะสมที่ตลาดมองข้ามในมุมมองของนักวิเคราะห์ (ความเชื่อมั่นปานกลาง เนื่องจากแรงขายสภาพคล่องอาจยังไม่หมดในระยะสั้น)",
+          "reasoning": "การขึ้นภาษีนำเข้าทั่วโลกเป็นเหตุการณ์ systemic ที่กระตุ้นภาวะ risk-off ส่งผลลบต่อกลุ่มส่งออก (technology) ผ่านห่วงโซ่อุปทาน กลุ่มพลังงานผ่านอุปสงค์โลกที่ลดลง และกลุ่ม bond proxy (telecom) ผ่านความผันผวนของตลาดตราสารหนี้ ขณะที่กลุ่มธนาคาร อสังหาริมทรัพย์ และขนส่งได้รับแรงกดดันจากความไม่แน่นอนทางเศรษฐกิจและการชะลอตัวของกิจกรรมการค้า",
+          "normalization_notes": [
+            "นำ sector ที่เป็นกลาง (neutral) ออกจาก affected_sectors: healthcare — ไม่ใช้จับคู่ลูกค้า"
+          ]
+        },
+        {
+          "affected_tickers": [],
+          "affected_sectors": [
+            "banking",
+            "telecom",
+            "technology",
+            "energy",
+            "property",
+            "transport"
+          ],
+          "sentiment": "negative",
+          "event_scope": "systemic",
+          "sector_impacts": [
+            {
+              "sector": "banking",
+              "direction": "negative",
+              "reason": "ภาวะ risk-off และความไม่แน่นอนทางการค้าโลกกดดันความเชื่อมั่นและอาจชะลอสินเชื่อ"
+            },
+            {
+              "sector": "telecom",
+              "direction": "negative",
+              "reason": "กลุ่ม bond proxy ได้รับแรงกดดันในภาวะที่พันธบัตรถูกขายออกและต้นทุนการเงินมีแนวโน้มสูงขึ้น"
+            },
+            {
+              "sector": "healthcare",
+              "direction": "neutral",
+              "reason": "กลุ่ม defensive มีความอ่อนไหวต่อมหภาคต่ำ แต่ภาวะ risk-off รุนแรงอาจกดดันตลาดโดยรวม"
+            },
+            {
+              "sector": "technology",
+              "direction": "negative",
+              "reason": "กลุ่มส่งออกอิเล็กทรอนิกส์ได้รับผลกระทบโดยตรงจากภาษีนำเข้าที่สูงขึ้นซึ่งกระทบห่วงโซ่อุปทานและต้นทุนการค้าระหว่างประเทศ"
+            },
+            {
+              "sector": "energy",
+              "direction": "negative",
+              "reason": "ความกังวลต่อการชะลอตัวของเศรษฐกิจโลกจากมาตรการภาษีกดดันอุปสงค์น้ำมันและราคาพลังงาน"
+            },
+            {
+              "sector": "property",
+              "direction": "negative",
+              "reason": "ภาวะ risk-off และความผันผวนของตลาดการเงินกดดันความเชื่อมั่นผู้บริโภคและการตัดสินใจลงทุนในอสังหาริมทรัพย์"
+            },
+            {
+              "sector": "transport",
+              "direction": "negative",
+              "reason": "ความกังวลต่อการค้าโลกและการชะลอตัวของเศรษฐกิจกระทบปริมาณการขนส่งและการเดินทางระหว่างประเทศ"
+            }
+          ],
+          "dislocation_detected": true,
+          "dislocation_description": "ตามทฤษฎี ภาวะ risk-off จากการประกาศขึ้นภาษีนำเข้าควรผลักดันให้เงินทุนไหลเข้าสินทรัพย์ปลอดภัย ได้แก่ ทองคำและพันธบัตรสหรัฐ แต่ในความเป็นจริง ทองคำกลับปรับลง 2.3% และพันธบัตรสหรัฐถูกขายออกพร้อมกัน ซึ่งสวนทางกับที่ควรเกิดขึ้น การที่สินทรัพย์ปลอดภัยทั้งสองประเภทปรับลงพร้อมกันในช่วง risk-off บ่งชี้ว่าแรงขายน่าจะมาจากการเพิ่มสภาพคล่องฉุกเฉิน (dash for cash / margin call) มากกว่าการปรับพอร์ตตามปกติ การปรับลงของทองคำในลักษณะนี้อาจเป็นจุดที่ตลาดมองข้ามและเปิดโอกาสสะสมในเชิงกลยุทธ์ (ความเชื่อมั่นปานกลาง เนื่องจากทั้งสองปัจจัยสวนทางพร้อมกัน ซึ่งเพิ่มน้ำหนักให้กับสมมติฐานนี้)",
+          "reasoning": "การขึ้นภาษีนำเข้าทั่วโลกเป็นเหตุการณ์ระดับ systemic ที่สร้างภาวะ risk-off กระทบกลุ่มส่งออก (technology) โดยตรงผ่านต้นทุนการค้าที่สูงขึ้น กระทบกลุ่ม energy ผ่านอุปสงค์โลกที่ชะลอ และกดดัน banking, property, transport, telecom ผ่านความเชื่อมั่นและต้นทุนการเงิน ขณะที่ healthcare มีความอ่อนไหวต่ำสุดในฐานะกลุ่ม defensive",
+          "normalization_notes": [
+            "นำ sector ที่เป็นกลาง (neutral) ออกจาก affected_sectors: healthcare — ไม่ใช้จับคู่ลูกค้า"
+          ]
+        },
+        {
+          "affected_tickers": [],
+          "affected_sectors": [
+            "banking",
+            "telecom",
+            "technology",
+            "energy",
+            "property",
+            "transport"
+          ],
+          "sentiment": "negative",
+          "event_scope": "systemic",
+          "sector_impacts": [
+            {
+              "sector": "banking",
+              "direction": "negative",
+              "reason": "ภาวะ risk-off และความไม่แน่นอนทางการค้าโลกกดดันความเชื่อมั่นและอาจชะลอสินเชื่อ"
+            },
+            {
+              "sector": "telecom",
+              "direction": "negative",
+              "reason": "กลุ่ม bond proxy ได้รับแรงกดดันในภาวะที่พันธบัตรถูกขายออกและต้นทุนการเงินอาจสูงขึ้น"
+            },
+            {
+              "sector": "healthcare",
+              "direction": "neutral",
+              "reason": "กลุ่ม defensive มีความอ่อนไหวต่อมหภาคต่ำ แต่ภาวะ risk-off ทั่วโลกอาจกดดันราคาในระยะสั้น"
+            },
+            {
+              "sector": "technology",
+              "direction": "negative",
+              "reason": "กลุ่มส่งออกอิเล็กทรอนิกส์พึ่งพาห่วงโซ่อุปทานระหว่างประเทศ การขึ้นภาษีนำเข้าเพิ่มต้นทุนและกดดันอุปสงค์"
+            },
+            {
+              "sector": "energy",
+              "direction": "negative",
+              "reason": "ความกังวลต่อการชะลอตัวของเศรษฐกิจโลกจากมาตรการภาษีกดดันราคาน้ำมันและรายได้กลุ่มพลังงาน"
+            },
+            {
+              "sector": "property",
+              "direction": "negative",
+              "reason": "ความไม่แน่นอนทางเศรษฐกิจและภาวะ risk-off ลดความเชื่อมั่นผู้บริโภคและกดดันอุปสงค์อสังหาริมทรัพย์"
+            },
+            {
+              "sector": "transport",
+              "direction": "negative",
+              "reason": "การค้าโลกที่ชะลอตัวจากมาตรการภาษีกระทบปริมาณการขนส่งและการเดินทางระหว่างประเทศ"
+            }
+          ],
+          "dislocation_detected": true,
+          "dislocation_description": "ตามทฤษฎี risk-off ทองคำและพันธบัตรสหรัฐควรปรับตัวขึ้นเมื่อนักลงทุนหนีออกจากสินทรัพย์เสี่ยง แต่ในความเป็นจริงทองคำกลับร่วงลง 2.3% และพันธบัตรสหรัฐถูกขายออกพร้อมกัน ซึ่งสวนทางกับทิศทางที่ควรเป็นอย่างชัดเจน การที่ safe haven ทั้งสองประเภทปรับลงพร้อมกันในภาวะ risk-off บ่งชี้ว่าแรงขายน่าจะมาจากการเพิ่มสภาพคล่องฉุกเฉิน (dash for cash / margin call) มากกว่าการเปลี่ยนแปลงพื้นฐาน การปรับลงของทองคำในลักษณะนี้อาจเป็นจุดที่ตลาดมองข้ามโอกาสสะสม (ความเชื่อมั่นปานกลาง เนื่องจากขนาดการเคลื่อนไหวมีนัยสำคัญและ safe haven สองตัวเคลื่อนไหวสวนทางพร้อมกัน ซึ่งเพิ่มความน่าเชื่อถือของสัญญาณ)",
+          "reasoning": "การขึ้นภาษีนำเข้าทั่วโลกเป็นเหตุการณ์ systemic ที่กระตุ้นภาวะ risk-off ส่งผลลบต่อกลุ่มส่งออก (technology) ผ่านต้นทุนห่วงโซ่อุปทาน กลุ่มพลังงานผ่านอุปสงค์โลกที่ชะลอ กลุ่ม telecom และ property ผ่านความเชื่อมั่นและต้นทุนการเงิน และกลุ่ม transport ผ่านปริมาณการค้าและการเดินทางที่ลดลง ขณะที่ healthcare มีความอ่อนไหวต่ำสุดในฐานะ defensive sector",
+          "normalization_notes": [
+            "นำ sector ที่เป็นกลาง (neutral) ออกจาก affected_sectors: healthcare — ไม่ใช้จับคู่ลูกค้า"
+          ]
+        },
+        {
+          "affected_tickers": [],
+          "affected_sectors": [
+            "banking",
+            "telecom",
+            "technology",
+            "energy",
+            "property",
+            "transport"
+          ],
+          "sentiment": "negative",
+          "event_scope": "systemic",
+          "sector_impacts": [
+            {
+              "sector": "banking",
+              "direction": "negative",
+              "reason": "ภาวะ risk-off และความไม่แน่นอนทางการค้าโลกกดดันความเชื่อมั่นและอาจชะลอสินเชื่อ"
+            },
+            {
+              "sector": "telecom",
+              "direction": "negative",
+              "reason": "กลุ่ม bond proxy ได้รับแรงกดดันเมื่อพันธบัตรถูกขายออกและต้นทุนการกู้ยืมสูงขึ้นในภาวะตลาดผันผวน"
+            },
+            {
+              "sector": "healthcare",
+              "direction": "neutral",
+              "reason": "กลุ่มดีเฟนซีฟมีความอ่อนไหวต่อมหภาคต่ำ แต่ภาวะ risk-off รุนแรงอาจกดดันราคาหุ้นโดยรวมได้บ้าง"
+            },
+            {
+              "sector": "technology",
+              "direction": "negative",
+              "reason": "กลุ่มส่งออกอิเล็กทรอนิกส์ได้รับผลกระทบโดยตรงจากภาษีนำเข้าที่สูงขึ้น ซึ่งกระทบห่วงโซ่อุปทานและต้นทุนการส่งออก"
+            },
+            {
+              "sector": "energy",
+              "direction": "negative",
+              "reason": "ความกังวลต่อการชะลอตัวของเศรษฐกิจโลกจากมาตรการภาษีกดดันอุปสงค์น้ำมันและราคาพลังงาน"
+            },
+            {
+              "sector": "property",
+              "direction": "negative",
+              "reason": "ภาวะตลาดผันผวนและความไม่แน่นอนทางเศรษฐกิจกดดันความเชื่อมั่นของผู้บริโภคและการตัดสินใจซื้ออสังหาริมทรัพย์"
+            },
+            {
+              "sector": "transport",
+              "direction": "negative",
+              "reason": "การค้าโลกที่ชะลอตัวจากมาตรการภาษีกระทบปริมาณการขนส่งและการเดินทางระหว่างประเทศ"
+            }
+          ],
+          "dislocation_detected": true,
+          "dislocation_description": "ตามทฤษฎี risk-off ทองคำและพันธบัตรสหรัฐควรปรับตัวขึ้นเมื่อนักลงทุนหนีออกจากสินทรัพย์เสี่ยง แต่ในความเป็นจริงทองคำกลับร่วงลง 2.3% และพันธบัตรสหรัฐถูกขายออกพร้อมกัน ซึ่งสวนทางกับความคาดหวังอย่างชัดเจน การที่ safe haven ทั้งสองประเภทปรับตัวลงพร้อมกันในภาวะ risk-off บ่งชี้ว่าแรงขายน่าจะมาจากการเพิ่มสภาพคล่องฉุกเฉิน (dash for cash / margin call) มากกว่าการปรับพอร์ตตามปกติ ความกว้างของ dislocation (สินทรัพย์ปลอดภัยสองประเภทเคลื่อนไหวสวนทางพร้อมกัน) เพิ่มความน่าเชื่อถือของสัญญาณนี้ และการปรับลงของทองคำอาจเป็นจุดที่ตลาดมองข้ามโอกาสสะสม (ความเชื่อมั่นปานกลาง-สูง)",
+          "reasoning": "การขึ้นภาษีนำเข้าทั่วโลกเป็นเหตุการณ์ systemic risk-off ที่กระทบทุกภาคส่วน: กลุ่มเทคโนโลยี/ส่งออก (DELTA, KCE, HANA) ได้รับผลกระทบโดยตรงจากต้นทุนภาษีและห่วงโซ่อุปทาน; กลุ่มพลังงานถูกกดดันจากอุปสงค์โลกที่ลดลง; กลุ่ม telecom และ property ซึ่งเป็น rate-sensitive ได้รับแรงกดดันจากความผันผวนของตลาดตราสารหนี้; กลุ่ม transport ได้รับผลกระทบจากการค้าและการเดินทางที่ชะลอตัว ขณะที่ healthcare มีความอ่อนไหวต่ำสุดในฐานะกลุ่มดีเฟนซีฟ",
+          "normalization_notes": [
+            "นำ sector ที่เป็นกลาง (neutral) ออกจาก affected_sectors: healthcare — ไม่ใช้จับคู่ลูกค้า"
+          ]
+        },
+        {
+          "affected_tickers": [],
+          "affected_sectors": [
+            "banking",
+            "telecom",
+            "technology",
+            "energy",
+            "property",
+            "transport"
+          ],
+          "sentiment": "negative",
+          "event_scope": "systemic",
+          "sector_impacts": [
+            {
+              "sector": "banking",
+              "direction": "negative",
+              "reason": "ภาวะ risk-off และความผันผวนของตลาดการเงินกดดันความเชื่อมั่นและคุณภาพสินทรัพย์ของธนาคาร"
+            },
+            {
+              "sector": "telecom",
+              "direction": "negative",
+              "reason": "กลุ่ม telecom เป็น bond proxy ที่อ่อนไหวต่อภาวะตลาดผันผวนและการเทขายสินทรัพย์เสี่ยงในวงกว้าง"
+            },
+            {
+              "sector": "healthcare",
+              "direction": "neutral",
+              "reason": "กลุ่มสุขภาพมีลักษณะ defensive ได้รับผลกระทบจากภาวะ risk-off น้อยกว่ากลุ่มอื่น"
+            },
+            {
+              "sector": "technology",
+              "direction": "negative",
+              "reason": "กลุ่มส่งออกอิเล็กทรอนิกส์พึ่งพาห่วงโซ่อุปทานระหว่างประเทศ การขึ้นภาษีนำเข้าทั่วโลกกระทบต้นทุนและความต้องการสินค้าโดยตรง"
+            },
+            {
+              "sector": "energy",
+              "direction": "negative",
+              "reason": "ความกังวลต่อการชะลอตัวของเศรษฐกิจโลกจากมาตรการภาษีกดดันอุปสงค์น้ำมันและราคาพลังงาน"
+            },
+            {
+              "sector": "property",
+              "direction": "negative",
+              "reason": "ภาวะ risk-off และความไม่แน่นอนทางเศรษฐกิจกดดันความเชื่อมั่นของผู้บริโภคและการตัดสินใจซื้ออสังหาริมทรัพย์"
+            },
+            {
+              "sector": "transport",
+              "direction": "negative",
+              "reason": "ความกังวลต่อการค้าโลกและการชะลอตัวของเศรษฐกิจกระทบปริมาณการขนส่งและการเดินทางระหว่างประเทศ"
+            }
+          ],
+          "dislocation_detected": true,
+          "dislocation_description": "ตามทฤษฎี ภาวะ risk-off จากการขึ้นภาษีนำเข้าทั่วโลกควรผลักดันให้เงินทุนไหลเข้าสินทรัพย์ปลอดภัย ได้แก่ ทองคำและพันธบัตรสหรัฐ แต่ผลที่เกิดขึ้นจริงคือทองคำปรับลง 2.3% และพันธบัตรสหรัฐถูกขายออกพร้อมกัน ซึ่งสวนทางกับที่ควรจะเป็นอย่างชัดเจน การที่สินทรัพย์ปลอดภัยทั้งสองประเภทปรับลงพร้อมกันในภาวะ risk-off บ่งชี้ว่าแรงขายน่าจะมาจากการเพิ่มสภาพคล่องฉุกเฉิน (dash for cash / margin call) มากกว่าการปรับพอร์ตตามปกติ การปรับลงของทองคำในลักษณะนี้อาจเป็นจุดที่ตลาดมองข้ามและเปิดโอกาสสะสมในเชิงกลยุทธ์ (ความเชื่อมั่นปานกลาง เนื่องจากทั้งสองปัจจัยสวนทางพร้อมกัน ซึ่งเพิ่มน้ำหนักให้กับสัญญาณ dislocation นี้)",
+          "reasoning": "การขึ้นภาษีนำเข้าทั่วโลกเป็นเหตุการณ์ระดับ systemic ที่กระตุ้นภาวะ risk-off ส่งผลลบต่อกลุ่มส่งออก (technology) ผ่านห่วงโซ่อุปทานและอุปสงค์ที่ลดลง กลุ่ม energy ผ่านความกังวลต่ออุปสงค์โลก และกลุ่ม property/transport/telecom/banking ผ่านความไม่แน่นอนทางเศรษฐกิจและการเทขายสินทรัพย์เสี่ยงในวงกว้าง ขณะที่ healthcare มีลักษณะ defensive จึงได้รับผลกระทบน้อยกว่า",
+          "normalization_notes": [
+            "นำ sector ที่เป็นกลาง (neutral) ออกจาก affected_sectors: healthcare — ไม่ใช้จับคู่ลูกค้า"
+          ]
+        }
+      ],
+      "clientSets": [
+        [
+          "C006",
+          "C007",
+          "C002",
+          "C003",
+          "C005",
+          "C009",
+          "C001",
+          "C008",
+          "C010",
+          "C004"
+        ],
+        [
+          "C006",
+          "C007",
+          "C002",
+          "C003",
+          "C005",
+          "C009",
+          "C001",
+          "C008",
+          "C010",
+          "C004"
+        ],
+        [
+          "C006",
+          "C007",
+          "C002",
+          "C003",
+          "C005",
+          "C009",
+          "C001",
+          "C008",
+          "C010",
+          "C004"
+        ],
+        [
+          "C006",
+          "C007",
+          "C002",
+          "C003",
+          "C005",
+          "C009",
+          "C001",
+          "C008",
+          "C010",
+          "C004"
+        ],
+        [
+          "C006",
+          "C007",
+          "C002",
+          "C003",
+          "C005",
+          "C009",
+          "C001",
+          "C008",
+          "C010",
+          "C004"
+        ]
+      ],
+      "raw": [
+        {
+          "affected_tickers": [],
+          "affected_sectors": [
+            "banking",
+            "telecom",
+            "technology",
+            "energy",
+            "property",
+            "transport"
+          ],
+          "sentiment": "negative",
+          "event_scope": "systemic",
+          "sector_impacts": [
+            {
+              "sector": "banking",
+              "direction": "negative",
+              "reason": "ภาวะ risk-off และความผันผวนของตลาดการเงินกดดันความเชื่อมั่นและอาจชะลอสินเชื่อในภาคธุรกิจที่พึ่งพาการค้าระหว่างประเทศ"
+            },
+            {
+              "sector": "telecom",
+              "direction": "negative",
+              "reason": "กลุ่ม telecom เป็น bond proxy ที่อ่อนไหวต่อภาวะตลาดผันผวน และการขายพันธบัตรสหรัฐสวนทางทฤษฎีสร้างความไม่แน่นอนต่อต้นทุนการกู้ยืม"
+            },
+            {
+              "sector": "healthcare",
+              "direction": "neutral",
+              "reason": "กลุ่มสุขภาพมีลักษณะ defensive ต่อแรงกดดันมหภาค แต่ภาวะ risk-off รุนแรงอาจกดดันราคาหุ้นในระยะสั้นจากแรงขายทั่วตลาด"
+            },
+            {
+              "sector": "technology",
+              "direction": "negative",
+              "reason": "กลุ่มส่งออกอิเล็กทรอนิกส์อย่าง DELTA, KCE และ HANA ได้รับผลกระทบโดยตรงจากภาษีนำเข้าที่สูงขึ้น ซึ่งกระทบห่วงโซ่อุปทานและต้นทุนการส่งออก"
+            },
+            {
+              "sector": "energy",
+              "direction": "negative",
+              "reason": "ความกังวลต่อการชะลอตัวของเศรษฐกิจโลกจากมาตรการภาษีกดดันอุปสงค์น้ำมันและราคาพลังงาน ซึ่งส่งผลลบต่อรายได้กลุ่มพลังงาน"
+            },
+            {
+              "sector": "property",
+              "direction": "negative",
+              "reason": "ภาวะตลาดผันผวนและความไม่แน่นอนทางเศรษฐกิจกดดันความเชื่อมั่นผู้บริโภคและการตัดสินใจซื้ออสังหาริมทรัพย์"
+            },
+            {
+              "sector": "transport",
+              "direction": "negative",
+              "reason": "ภาวะ risk-off และการชะลอตัวของการค้าโลกกดดันปริมาณการเดินทางและโลจิสติกส์ ส่งผลลบต่อกลุ่มขนส่ง"
+            }
+          ],
+          "dislocation_detected": true,
+          "dislocation_description": "ในภาวะ risk-off จากการประกาศขึ้นภาษีนำเข้า ทองคำและพันธบัตรสหรัฐควรปรับตัวขึ้นตามทฤษฎีการไหลเข้าสู่สินทรัพย์ปลอดภัย แต่ในความเป็นจริงทองคำกลับปรับลง 2.3% และพันธบัตรสหรัฐถูกขายออกพร้อมกัน ซึ่งสวนทางกับที่ควรเป็นอย่างชัดเจน รูปแบบนี้บ่งชี้ว่าแรงขายน่าจะมาจากการเพิ่มสภาพคล่องฉุกเฉิน (dash for cash / margin call) มากกว่าการปรับพอร์ตตามปัจจัยพื้นฐาน การที่ทองคำร่วงสวนทาง risk-off อาจสะท้อนการ mispricing ชั่วคราว และอาจเป็นโอกาสสะสมที่ตลาดมองข้ามในมุมมองของนักวิเคราะห์ (ความเชื่อมั่นปานกลาง เนื่องจากแรงขายสภาพคล่องอาจยังไม่หมดในระยะสั้น)",
+          "reasoning": "การขึ้นภาษีนำเข้าทั่วโลกเป็นเหตุการณ์ systemic ที่กระตุ้นภาวะ risk-off ส่งผลลบต่อกลุ่มส่งออก (technology) ผ่านห่วงโซ่อุปทาน กลุ่มพลังงานผ่านอุปสงค์โลกที่ลดลง และกลุ่ม bond proxy (telecom) ผ่านความผันผวนของตลาดตราสารหนี้ ขณะที่กลุ่มธนาคาร อสังหาริมทรัพย์ และขนส่งได้รับแรงกดดันจากความไม่แน่นอนทางเศรษฐกิจและการชะลอตัวของกิจกรรมการค้า",
+          "normalization_notes": [
+            "นำ sector ที่เป็นกลาง (neutral) ออกจาก affected_sectors: healthcare — ไม่ใช้จับคู่ลูกค้า"
+          ]
+        },
+        {
+          "affected_tickers": [],
+          "affected_sectors": [
+            "banking",
+            "telecom",
+            "technology",
+            "energy",
+            "property",
+            "transport"
+          ],
+          "sentiment": "negative",
+          "event_scope": "systemic",
+          "sector_impacts": [
+            {
+              "sector": "banking",
+              "direction": "negative",
+              "reason": "ภาวะ risk-off และความไม่แน่นอนทางการค้าโลกกดดันความเชื่อมั่นและอาจชะลอสินเชื่อ"
+            },
+            {
+              "sector": "telecom",
+              "direction": "negative",
+              "reason": "กลุ่ม bond proxy ได้รับแรงกดดันในภาวะที่พันธบัตรถูกขายออกและต้นทุนการเงินมีแนวโน้มสูงขึ้น"
+            },
+            {
+              "sector": "healthcare",
+              "direction": "neutral",
+              "reason": "กลุ่ม defensive มีความอ่อนไหวต่อมหภาคต่ำ แต่ภาวะ risk-off รุนแรงอาจกดดันตลาดโดยรวม"
+            },
+            {
+              "sector": "technology",
+              "direction": "negative",
+              "reason": "กลุ่มส่งออกอิเล็กทรอนิกส์ได้รับผลกระทบโดยตรงจากภาษีนำเข้าที่สูงขึ้นซึ่งกระทบห่วงโซ่อุปทานและต้นทุนการค้าระหว่างประเทศ"
+            },
+            {
+              "sector": "energy",
+              "direction": "negative",
+              "reason": "ความกังวลต่อการชะลอตัวของเศรษฐกิจโลกจากมาตรการภาษีกดดันอุปสงค์น้ำมันและราคาพลังงาน"
+            },
+            {
+              "sector": "property",
+              "direction": "negative",
+              "reason": "ภาวะ risk-off และความผันผวนของตลาดการเงินกดดันความเชื่อมั่นผู้บริโภคและการตัดสินใจลงทุนในอสังหาริมทรัพย์"
+            },
+            {
+              "sector": "transport",
+              "direction": "negative",
+              "reason": "ความกังวลต่อการค้าโลกและการชะลอตัวของเศรษฐกิจกระทบปริมาณการขนส่งและการเดินทางระหว่างประเทศ"
+            }
+          ],
+          "dislocation_detected": true,
+          "dislocation_description": "ตามทฤษฎี ภาวะ risk-off จากการประกาศขึ้นภาษีนำเข้าควรผลักดันให้เงินทุนไหลเข้าสินทรัพย์ปลอดภัย ได้แก่ ทองคำและพันธบัตรสหรัฐ แต่ในความเป็นจริง ทองคำกลับปรับลง 2.3% และพันธบัตรสหรัฐถูกขายออกพร้อมกัน ซึ่งสวนทางกับที่ควรเกิดขึ้น การที่สินทรัพย์ปลอดภัยทั้งสองประเภทปรับลงพร้อมกันในช่วง risk-off บ่งชี้ว่าแรงขายน่าจะมาจากการเพิ่มสภาพคล่องฉุกเฉิน (dash for cash / margin call) มากกว่าการปรับพอร์ตตามปกติ การปรับลงของทองคำในลักษณะนี้อาจเป็นจุดที่ตลาดมองข้ามและเปิดโอกาสสะสมในเชิงกลยุทธ์ (ความเชื่อมั่นปานกลาง เนื่องจากทั้งสองปัจจัยสวนทางพร้อมกัน ซึ่งเพิ่มน้ำหนักให้กับสมมติฐานนี้)",
+          "reasoning": "การขึ้นภาษีนำเข้าทั่วโลกเป็นเหตุการณ์ระดับ systemic ที่สร้างภาวะ risk-off กระทบกลุ่มส่งออก (technology) โดยตรงผ่านต้นทุนการค้าที่สูงขึ้น กระทบกลุ่ม energy ผ่านอุปสงค์โลกที่ชะลอ และกดดัน banking, property, transport, telecom ผ่านความเชื่อมั่นและต้นทุนการเงิน ขณะที่ healthcare มีความอ่อนไหวต่ำสุดในฐานะกลุ่ม defensive",
+          "normalization_notes": [
+            "นำ sector ที่เป็นกลาง (neutral) ออกจาก affected_sectors: healthcare — ไม่ใช้จับคู่ลูกค้า"
+          ]
+        },
+        {
+          "affected_tickers": [],
+          "affected_sectors": [
+            "banking",
+            "telecom",
+            "technology",
+            "energy",
+            "property",
+            "transport"
+          ],
+          "sentiment": "negative",
+          "event_scope": "systemic",
+          "sector_impacts": [
+            {
+              "sector": "banking",
+              "direction": "negative",
+              "reason": "ภาวะ risk-off และความไม่แน่นอนทางการค้าโลกกดดันความเชื่อมั่นและอาจชะลอสินเชื่อ"
+            },
+            {
+              "sector": "telecom",
+              "direction": "negative",
+              "reason": "กลุ่ม bond proxy ได้รับแรงกดดันในภาวะที่พันธบัตรถูกขายออกและต้นทุนการเงินอาจสูงขึ้น"
+            },
+            {
+              "sector": "healthcare",
+              "direction": "neutral",
+              "reason": "กลุ่ม defensive มีความอ่อนไหวต่อมหภาคต่ำ แต่ภาวะ risk-off ทั่วโลกอาจกดดันราคาในระยะสั้น"
+            },
+            {
+              "sector": "technology",
+              "direction": "negative",
+              "reason": "กลุ่มส่งออกอิเล็กทรอนิกส์พึ่งพาห่วงโซ่อุปทานระหว่างประเทศ การขึ้นภาษีนำเข้าเพิ่มต้นทุนและกดดันอุปสงค์"
+            },
+            {
+              "sector": "energy",
+              "direction": "negative",
+              "reason": "ความกังวลต่อการชะลอตัวของเศรษฐกิจโลกจากมาตรการภาษีกดดันราคาน้ำมันและรายได้กลุ่มพลังงาน"
+            },
+            {
+              "sector": "property",
+              "direction": "negative",
+              "reason": "ความไม่แน่นอนทางเศรษฐกิจและภาวะ risk-off ลดความเชื่อมั่นผู้บริโภคและกดดันอุปสงค์อสังหาริมทรัพย์"
+            },
+            {
+              "sector": "transport",
+              "direction": "negative",
+              "reason": "การค้าโลกที่ชะลอตัวจากมาตรการภาษีกระทบปริมาณการขนส่งและการเดินทางระหว่างประเทศ"
+            }
+          ],
+          "dislocation_detected": true,
+          "dislocation_description": "ตามทฤษฎี risk-off ทองคำและพันธบัตรสหรัฐควรปรับตัวขึ้นเมื่อนักลงทุนหนีออกจากสินทรัพย์เสี่ยง แต่ในความเป็นจริงทองคำกลับร่วงลง 2.3% และพันธบัตรสหรัฐถูกขายออกพร้อมกัน ซึ่งสวนทางกับทิศทางที่ควรเป็นอย่างชัดเจน การที่ safe haven ทั้งสองประเภทปรับลงพร้อมกันในภาวะ risk-off บ่งชี้ว่าแรงขายน่าจะมาจากการเพิ่มสภาพคล่องฉุกเฉิน (dash for cash / margin call) มากกว่าการเปลี่ยนแปลงพื้นฐาน การปรับลงของทองคำในลักษณะนี้อาจเป็นจุดที่ตลาดมองข้ามโอกาสสะสม (ความเชื่อมั่นปานกลาง เนื่องจากขนาดการเคลื่อนไหวมีนัยสำคัญและ safe haven สองตัวเคลื่อนไหวสวนทางพร้อมกัน ซึ่งเพิ่มความน่าเชื่อถือของสัญญาณ)",
+          "reasoning": "การขึ้นภาษีนำเข้าทั่วโลกเป็นเหตุการณ์ systemic ที่กระตุ้นภาวะ risk-off ส่งผลลบต่อกลุ่มส่งออก (technology) ผ่านต้นทุนห่วงโซ่อุปทาน กลุ่มพลังงานผ่านอุปสงค์โลกที่ชะลอ กลุ่ม telecom และ property ผ่านความเชื่อมั่นและต้นทุนการเงิน และกลุ่ม transport ผ่านปริมาณการค้าและการเดินทางที่ลดลง ขณะที่ healthcare มีความอ่อนไหวต่ำสุดในฐานะ defensive sector",
+          "normalization_notes": [
+            "นำ sector ที่เป็นกลาง (neutral) ออกจาก affected_sectors: healthcare — ไม่ใช้จับคู่ลูกค้า"
+          ]
+        },
+        {
+          "affected_tickers": [],
+          "affected_sectors": [
+            "banking",
+            "telecom",
+            "technology",
+            "energy",
+            "property",
+            "transport"
+          ],
+          "sentiment": "negative",
+          "event_scope": "systemic",
+          "sector_impacts": [
+            {
+              "sector": "banking",
+              "direction": "negative",
+              "reason": "ภาวะ risk-off และความไม่แน่นอนทางการค้าโลกกดดันความเชื่อมั่นและอาจชะลอสินเชื่อ"
+            },
+            {
+              "sector": "telecom",
+              "direction": "negative",
+              "reason": "กลุ่ม bond proxy ได้รับแรงกดดันเมื่อพันธบัตรถูกขายออกและต้นทุนการกู้ยืมสูงขึ้นในภาวะตลาดผันผวน"
+            },
+            {
+              "sector": "healthcare",
+              "direction": "neutral",
+              "reason": "กลุ่มดีเฟนซีฟมีความอ่อนไหวต่อมหภาคต่ำ แต่ภาวะ risk-off รุนแรงอาจกดดันราคาหุ้นโดยรวมได้บ้าง"
+            },
+            {
+              "sector": "technology",
+              "direction": "negative",
+              "reason": "กลุ่มส่งออกอิเล็กทรอนิกส์ได้รับผลกระทบโดยตรงจากภาษีนำเข้าที่สูงขึ้น ซึ่งกระทบห่วงโซ่อุปทานและต้นทุนการส่งออก"
+            },
+            {
+              "sector": "energy",
+              "direction": "negative",
+              "reason": "ความกังวลต่อการชะลอตัวของเศรษฐกิจโลกจากมาตรการภาษีกดดันอุปสงค์น้ำมันและราคาพลังงาน"
+            },
+            {
+              "sector": "property",
+              "direction": "negative",
+              "reason": "ภาวะตลาดผันผวนและความไม่แน่นอนทางเศรษฐกิจกดดันความเชื่อมั่นของผู้บริโภคและการตัดสินใจซื้ออสังหาริมทรัพย์"
+            },
+            {
+              "sector": "transport",
+              "direction": "negative",
+              "reason": "การค้าโลกที่ชะลอตัวจากมาตรการภาษีกระทบปริมาณการขนส่งและการเดินทางระหว่างประเทศ"
+            }
+          ],
+          "dislocation_detected": true,
+          "dislocation_description": "ตามทฤษฎี risk-off ทองคำและพันธบัตรสหรัฐควรปรับตัวขึ้นเมื่อนักลงทุนหนีออกจากสินทรัพย์เสี่ยง แต่ในความเป็นจริงทองคำกลับร่วงลง 2.3% และพันธบัตรสหรัฐถูกขายออกพร้อมกัน ซึ่งสวนทางกับความคาดหวังอย่างชัดเจน การที่ safe haven ทั้งสองประเภทปรับตัวลงพร้อมกันในภาวะ risk-off บ่งชี้ว่าแรงขายน่าจะมาจากการเพิ่มสภาพคล่องฉุกเฉิน (dash for cash / margin call) มากกว่าการปรับพอร์ตตามปกติ ความกว้างของ dislocation (สินทรัพย์ปลอดภัยสองประเภทเคลื่อนไหวสวนทางพร้อมกัน) เพิ่มความน่าเชื่อถือของสัญญาณนี้ และการปรับลงของทองคำอาจเป็นจุดที่ตลาดมองข้ามโอกาสสะสม (ความเชื่อมั่นปานกลาง-สูง)",
+          "reasoning": "การขึ้นภาษีนำเข้าทั่วโลกเป็นเหตุการณ์ systemic risk-off ที่กระทบทุกภาคส่วน: กลุ่มเทคโนโลยี/ส่งออก (DELTA, KCE, HANA) ได้รับผลกระทบโดยตรงจากต้นทุนภาษีและห่วงโซ่อุปทาน; กลุ่มพลังงานถูกกดดันจากอุปสงค์โลกที่ลดลง; กลุ่ม telecom และ property ซึ่งเป็น rate-sensitive ได้รับแรงกดดันจากความผันผวนของตลาดตราสารหนี้; กลุ่ม transport ได้รับผลกระทบจากการค้าและการเดินทางที่ชะลอตัว ขณะที่ healthcare มีความอ่อนไหวต่ำสุดในฐานะกลุ่มดีเฟนซีฟ",
+          "normalization_notes": [
+            "นำ sector ที่เป็นกลาง (neutral) ออกจาก affected_sectors: healthcare — ไม่ใช้จับคู่ลูกค้า"
+          ]
+        },
+        {
+          "affected_tickers": [],
+          "affected_sectors": [
+            "banking",
+            "telecom",
+            "technology",
+            "energy",
+            "property",
+            "transport"
+          ],
+          "sentiment": "negative",
+          "event_scope": "systemic",
+          "sector_impacts": [
+            {
+              "sector": "banking",
+              "direction": "negative",
+              "reason": "ภาวะ risk-off และความผันผวนของตลาดการเงินกดดันความเชื่อมั่นและคุณภาพสินทรัพย์ของธนาคาร"
+            },
+            {
+              "sector": "telecom",
+              "direction": "negative",
+              "reason": "กลุ่ม telecom เป็น bond proxy ที่อ่อนไหวต่อภาวะตลาดผันผวนและการเทขายสินทรัพย์เสี่ยงในวงกว้าง"
+            },
+            {
+              "sector": "healthcare",
+              "direction": "neutral",
+              "reason": "กลุ่มสุขภาพมีลักษณะ defensive ได้รับผลกระทบจากภาวะ risk-off น้อยกว่ากลุ่มอื่น"
+            },
+            {
+              "sector": "technology",
+              "direction": "negative",
+              "reason": "กลุ่มส่งออกอิเล็กทรอนิกส์พึ่งพาห่วงโซ่อุปทานระหว่างประเทศ การขึ้นภาษีนำเข้าทั่วโลกกระทบต้นทุนและความต้องการสินค้าโดยตรง"
+            },
+            {
+              "sector": "energy",
+              "direction": "negative",
+              "reason": "ความกังวลต่อการชะลอตัวของเศรษฐกิจโลกจากมาตรการภาษีกดดันอุปสงค์น้ำมันและราคาพลังงาน"
+            },
+            {
+              "sector": "property",
+              "direction": "negative",
+              "reason": "ภาวะ risk-off และความไม่แน่นอนทางเศรษฐกิจกดดันความเชื่อมั่นของผู้บริโภคและการตัดสินใจซื้ออสังหาริมทรัพย์"
+            },
+            {
+              "sector": "transport",
+              "direction": "negative",
+              "reason": "ความกังวลต่อการค้าโลกและการชะลอตัวของเศรษฐกิจกระทบปริมาณการขนส่งและการเดินทางระหว่างประเทศ"
+            }
+          ],
+          "dislocation_detected": true,
+          "dislocation_description": "ตามทฤษฎี ภาวะ risk-off จากการขึ้นภาษีนำเข้าทั่วโลกควรผลักดันให้เงินทุนไหลเข้าสินทรัพย์ปลอดภัย ได้แก่ ทองคำและพันธบัตรสหรัฐ แต่ผลที่เกิดขึ้นจริงคือทองคำปรับลง 2.3% และพันธบัตรสหรัฐถูกขายออกพร้อมกัน ซึ่งสวนทางกับที่ควรจะเป็นอย่างชัดเจน การที่สินทรัพย์ปลอดภัยทั้งสองประเภทปรับลงพร้อมกันในภาวะ risk-off บ่งชี้ว่าแรงขายน่าจะมาจากการเพิ่มสภาพคล่องฉุกเฉิน (dash for cash / margin call) มากกว่าการปรับพอร์ตตามปกติ การปรับลงของทองคำในลักษณะนี้อาจเป็นจุดที่ตลาดมองข้ามและเปิดโอกาสสะสมในเชิงกลยุทธ์ (ความเชื่อมั่นปานกลาง เนื่องจากทั้งสองปัจจัยสวนทางพร้อมกัน ซึ่งเพิ่มน้ำหนักให้กับสัญญาณ dislocation นี้)",
+          "reasoning": "การขึ้นภาษีนำเข้าทั่วโลกเป็นเหตุการณ์ระดับ systemic ที่กระตุ้นภาวะ risk-off ส่งผลลบต่อกลุ่มส่งออก (technology) ผ่านห่วงโซ่อุปทานและอุปสงค์ที่ลดลง กลุ่ม energy ผ่านความกังวลต่ออุปสงค์โลก และกลุ่ม property/transport/telecom/banking ผ่านความไม่แน่นอนทางเศรษฐกิจและการเทขายสินทรัพย์เสี่ยงในวงกว้าง ขณะที่ healthcare มีลักษณะ defensive จึงได้รับผลกระทบน้อยกว่า",
+          "normalization_notes": [
+            "นำ sector ที่เป็นกลาง (neutral) ออกจาก affected_sectors: healthcare — ไม่ใช้จับคู่ลูกค้า"
+          ]
+        }
+      ]
+    },
+    {
+      "newsId": "N007",
+      "headline": "Fed raises federal funds rate by 25 basis points to 3.75%-4.00%, first hike since July 2023",
+      "source": "src/data/mockNews.js",
+      "outputs": [],
+      "clientSets": [],
+      "raw": [],
+      "error": "Agent \"impact\" request failed (502): invalid_model_output"
+    },
+    {
+      "newsId": "EVAL-CPN",
+      "headline": "Central Pattana and Mitsubishi Estate announce $330m mixed-use project",
+      "source": "evals/fixtures/cpn-single-company.json",
+      "outputs": [
+        {
+          "affected_tickers": [
+            "CPN"
+          ],
+          "affected_sectors": [
+            "property"
+          ],
+          "sentiment": "positive",
+          "event_scope": "single_company",
+          "sector_impacts": [
+            {
+              "sector": "property",
+              "direction": "positive",
+              "reason": "CPN ร่วมทุนกับ Mitsubishi Estate พัฒนาโครงการมิกซ์ยูสมูลค่า 330 ล้านดอลลาร์ในกรุงเทพฯ ซึ่งเป็นการขยายพอร์ตโฟลิโอและเพิ่มศักยภาพการเติบโตของบริษัท"
+            }
+          ],
+          "dislocation_detected": false,
+          "dislocation_description": "",
+          "reasoning": "ข่าวนี้เป็นระดับ single_company เกี่ยวกับ CPN โดยตรง การร่วมทุนกับพันธมิตรญี่ปุ่นในโครงการขนาดใหญ่เป็นปัจจัยบวกต่อมูลค่าบริษัท อย่างไรก็ตาม ไม่มีข้อมูลราคาตลาดหลังข่าว จึงไม่สามารถประเมิน dislocation ได้",
+          "normalization_notes": []
+        },
+        {
+          "affected_tickers": [
+            "CPN"
+          ],
+          "affected_sectors": [
+            "property"
+          ],
+          "sentiment": "positive",
+          "event_scope": "single_company",
+          "sector_impacts": [
+            {
+              "sector": "property",
+              "direction": "positive",
+              "reason": "CPN ร่วมทุนกับ Mitsubishi Estate พัฒนาโครงการมิกซ์ยูสมูลค่า 330 ล้านดอลลาร์ในกรุงเทพฯ ซึ่งเพิ่มโอกาสสร้างรายได้จากพื้นที่ค้าปลีก สำนักงาน และที่อยู่อาศัยในอนาคต"
+            }
+          ],
+          "dislocation_detected": false,
+          "dislocation_description": "",
+          "reasoning": "ข่าวนี้เป็นระดับบริษัทเดียว (CPN) ที่ประกาศร่วมทุนพัฒนาโครงการขนาดใหญ่ ซึ่งโดยทฤษฎีควรส่งผลบวกต่อมูลค่าและศักยภาพการเติบโตของ CPN โดยตรง แต่ไม่มีข้อมูลราคาตลาดเพียงพอที่จะประเมิน dislocation ได้",
+          "normalization_notes": []
+        }
+      ],
+      "clientSets": [
+        [
+          "C007",
+          "C003"
+        ],
+        [
+          "C007",
+          "C003"
+        ]
+      ],
+      "raw": [
+        {
+          "affected_tickers": [
+            "CPN"
+          ],
+          "affected_sectors": [
+            "property"
+          ],
+          "sentiment": "positive",
+          "event_scope": "single_company",
+          "sector_impacts": [
+            {
+              "sector": "property",
+              "direction": "positive",
+              "reason": "CPN ร่วมทุนกับ Mitsubishi Estate พัฒนาโครงการมิกซ์ยูสมูลค่า 330 ล้านดอลลาร์ในกรุงเทพฯ ซึ่งเป็นการขยายพอร์ตโฟลิโอและเพิ่มศักยภาพการเติบโตของบริษัท"
+            }
+          ],
+          "dislocation_detected": false,
+          "dislocation_description": "",
+          "reasoning": "ข่าวนี้เป็นระดับ single_company เกี่ยวกับ CPN โดยตรง การร่วมทุนกับพันธมิตรญี่ปุ่นในโครงการขนาดใหญ่เป็นปัจจัยบวกต่อมูลค่าบริษัท อย่างไรก็ตาม ไม่มีข้อมูลราคาตลาดหลังข่าว จึงไม่สามารถประเมิน dislocation ได้",
+          "normalization_notes": []
+        },
+        {
+          "affected_tickers": [
+            "CPN"
+          ],
+          "affected_sectors": [
+            "property"
+          ],
+          "sentiment": "positive",
+          "event_scope": "single_company",
+          "sector_impacts": [
+            {
+              "sector": "property",
+              "direction": "positive",
+              "reason": "CPN ร่วมทุนกับ Mitsubishi Estate พัฒนาโครงการมิกซ์ยูสมูลค่า 330 ล้านดอลลาร์ในกรุงเทพฯ ซึ่งเพิ่มโอกาสสร้างรายได้จากพื้นที่ค้าปลีก สำนักงาน และที่อยู่อาศัยในอนาคต"
+            }
+          ],
+          "dislocation_detected": false,
+          "dislocation_description": "",
+          "reasoning": "ข่าวนี้เป็นระดับบริษัทเดียว (CPN) ที่ประกาศร่วมทุนพัฒนาโครงการขนาดใหญ่ ซึ่งโดยทฤษฎีควรส่งผลบวกต่อมูลค่าและศักยภาพการเติบโตของ CPN โดยตรง แต่ไม่มีข้อมูลราคาตลาดเพียงพอที่จะประเมิน dislocation ได้",
+          "normalization_notes": []
+        }
+      ],
+      "error": "Agent \"impact\" request failed (502): upstream_error"
+    }
+  ],
+  "metrics": [
+    {
+      "newsId": "N006",
+      "runs": 5,
+      "eventScope": {
+        "value": "systemic",
+        "count": 5,
+        "runs": 5,
+        "share": 1,
+        "distribution": {
+          "systemic": 5
+        }
+      },
+      "sentiment": {
+        "value": "negative",
+        "count": 5,
+        "runs": 5,
+        "share": 1,
+        "distribution": {
+          "negative": 5
+        }
+      },
+      "dislocation": {
+        "detectedRuns": 5,
+        "detectedShare": 1,
+        "agreementShare": 1
+      },
+      "sectors": {
+        "banking": {
+          "listedRuns": 5,
+          "listedShare": 1,
+          "matchingRuns": 5,
+          "matchingShare": 1,
+          "directionCounts": {
+            "positive": 0,
+            "negative": 5,
+            "neutral": 0
+          },
+          "modalDirection": "negative",
+          "modalDirectionShare": 1,
+          "flipped": false
+        },
+        "energy": {
+          "listedRuns": 5,
+          "listedShare": 1,
+          "matchingRuns": 5,
+          "matchingShare": 1,
+          "directionCounts": {
+            "positive": 0,
+            "negative": 5,
+            "neutral": 0
+          },
+          "modalDirection": "negative",
+          "modalDirectionShare": 1,
+          "flipped": false
+        },
+        "healthcare": {
+          "listedRuns": 5,
+          "listedShare": 1,
+          "matchingRuns": 0,
+          "matchingShare": 0,
+          "directionCounts": {
+            "positive": 0,
+            "negative": 0,
+            "neutral": 5
+          },
+          "modalDirection": "neutral",
+          "modalDirectionShare": 1,
+          "flipped": false
+        },
+        "property": {
+          "listedRuns": 5,
+          "listedShare": 1,
+          "matchingRuns": 5,
+          "matchingShare": 1,
+          "directionCounts": {
+            "positive": 0,
+            "negative": 5,
+            "neutral": 0
+          },
+          "modalDirection": "negative",
+          "modalDirectionShare": 1,
+          "flipped": false
+        },
+        "technology": {
+          "listedRuns": 5,
+          "listedShare": 1,
+          "matchingRuns": 5,
+          "matchingShare": 1,
+          "directionCounts": {
+            "positive": 0,
+            "negative": 5,
+            "neutral": 0
+          },
+          "modalDirection": "negative",
+          "modalDirectionShare": 1,
+          "flipped": false
+        },
+        "telecom": {
+          "listedRuns": 5,
+          "listedShare": 1,
+          "matchingRuns": 5,
+          "matchingShare": 1,
+          "directionCounts": {
+            "positive": 0,
+            "negative": 5,
+            "neutral": 0
+          },
+          "modalDirection": "negative",
+          "modalDirectionShare": 1,
+          "flipped": false
+        },
+        "transport": {
+          "listedRuns": 5,
+          "listedShare": 1,
+          "matchingRuns": 5,
+          "matchingShare": 1,
+          "directionCounts": {
+            "positive": 0,
+            "negative": 5,
+            "neutral": 0
+          },
+          "modalDirection": "negative",
+          "modalDirectionShare": 1,
+          "flipped": false
+        }
+      },
+      "tickers": {
+        "meanCount": 0,
+        "minCount": 0,
+        "maxCount": 0,
+        "always": [],
+        "sometimes": []
+      },
+      "clients": {
+        "runs": 5,
+        "identicalSetShare": 1,
+        "distinctSets": 1,
+        "meanCount": 10,
+        "perClient": {
+          "C001": {
+            "runs": 5,
+            "share": 1
+          },
+          "C002": {
+            "runs": 5,
+            "share": 1
+          },
+          "C003": {
+            "runs": 5,
+            "share": 1
+          },
+          "C004": {
+            "runs": 5,
+            "share": 1
+          },
+          "C005": {
+            "runs": 5,
+            "share": 1
+          },
+          "C006": {
+            "runs": 5,
+            "share": 1
+          },
+          "C007": {
+            "runs": 5,
+            "share": 1
+          },
+          "C008": {
+            "runs": 5,
+            "share": 1
+          },
+          "C009": {
+            "runs": 5,
+            "share": 1
+          },
+          "C010": {
+            "runs": 5,
+            "share": 1
+          }
+        }
+      },
+      "stabilityScore": 1,
+      "flippedSectors": [],
+      "headline": "ทรัมป์ประกาศขึ้นภาษีนำเข้าทั่วโลก ตลาดการเงินผันผวนหนัก"
+    },
+    {
+      "newsId": "N007",
+      "headline": "Fed raises federal funds rate by 25 basis points to 3.75%-4.00%, first hike since July 2023",
+      "error": "Agent \"impact\" request failed (502): invalid_model_output",
+      "runs": 0
+    },
+    {
+      "newsId": "EVAL-CPN",
+      "runs": 2,
+      "eventScope": {
+        "value": "single_company",
+        "count": 2,
+        "runs": 2,
+        "share": 1,
+        "distribution": {
+          "single_company": 2
+        }
+      },
+      "sentiment": {
+        "value": "positive",
+        "count": 2,
+        "runs": 2,
+        "share": 1,
+        "distribution": {
+          "positive": 2
+        }
+      },
+      "dislocation": {
+        "detectedRuns": 0,
+        "detectedShare": 0,
+        "agreementShare": 1
+      },
+      "sectors": {
+        "property": {
+          "listedRuns": 2,
+          "listedShare": 1,
+          "matchingRuns": 2,
+          "matchingShare": 1,
+          "directionCounts": {
+            "positive": 2,
+            "negative": 0,
+            "neutral": 0
+          },
+          "modalDirection": "positive",
+          "modalDirectionShare": 1,
+          "flipped": false
+        }
+      },
+      "tickers": {
+        "meanCount": 1,
+        "minCount": 1,
+        "maxCount": 1,
+        "always": [
+          "CPN"
+        ],
+        "sometimes": []
+      },
+      "clients": {
+        "runs": 2,
+        "identicalSetShare": 1,
+        "distinctSets": 1,
+        "meanCount": 2,
+        "perClient": {
+          "C003": {
+            "runs": 2,
+            "share": 1
+          },
+          "C007": {
+            "runs": 2,
+            "share": 1
+          }
+        }
+      },
+      "stabilityScore": 1,
+      "flippedSectors": [],
+      "headline": "Central Pattana and Mitsubishi Estate announce $330m mixed-use project",
+      "error": "Agent \"impact\" request failed (502): upstream_error",
+      "incomplete": true
+    }
+  ],
+  "notes": [
+    "N007: run 1 failed — Agent \"impact\" request failed (502): invalid_model_output",
+    "EVAL-CPN: run 3 failed — Agent \"impact\" request failed (502): upstream_error"
+  ]
+}
