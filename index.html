@@ -6,13 +6,66 @@
     <meta name="color-scheme" content="dark" />
     <!-- Set before first paint so the page never flashes white on load. -->
     <meta name="theme-color" content="#0b0b0d" />
-    <title>RM Advantage Engine — Client Portfolio Intelligence</title>
+    <title>Bulletin</title>
 
     <!--
-      Fonts. IBM Plex Sans Thai carries the Thai UI (the app is Thai-primary);
-      Inter carries Latin text and, critically, the numerals — the whole layout
-      is numbers-first and Plex Thai's Latin figures are not as even.
-      The browser picks per glyph, so both must be present.
+      FAVICONS — why there are two variants wired up.
+
+      Both supplied packages are TRANSPARENT-background (verified: every corner
+      is alpha 0 in all ten PNGs). The "black" mark is rgb(19,18,18) and the
+      "white" mark is rgb(255,255,255), so neither one is legible on both a
+      light and a dark browser tab strip — ship either alone and half of all
+      users see an empty square.
+
+      So: prefers-color-scheme picks the right one, and the media-less <link>
+      first is the fallback for browsers that ignore media on icons. That
+      fallback is the BLACK mark, because a light tab strip is the case where an
+      invisible icon looks most broken.
+
+      apple-touch-icon and the android-chrome icons are NOT transparent: iOS and
+      Android launchers composite an icon on their own background, which is
+      often white, and the white mark would disappear. Those three are generated
+      by compositing the white mark over --color-bg (#0b0b0d) — the only new
+      assets in this phase.
+    -->
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="/favicon-32x32-light.png"
+      media="(prefers-color-scheme: light)"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="16x16"
+      href="/favicon-16x16-light.png"
+      media="(prefers-color-scheme: light)"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="/favicon-32x32-dark.png"
+      media="(prefers-color-scheme: dark)"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="16x16"
+      href="/favicon-16x16-dark.png"
+      media="(prefers-color-scheme: dark)"
+    />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!--
+      Fonts. IBM Plex Sans Thai carries the Thai UI (content is Thai-primary);
+      Inter is the Latin/numeral fallback for non-Apple platforms. On Apple
+      devices the stack resolves to the system face (SF) BEFORE reaching Inter —
+      see the note in src/styles/tokens.css. Inter is still loaded because it is
+      what Windows, Android and Linux actually get.
 
       preconnect first: Google Fonts serves CSS from one origin and the woff2
       from another, and without the second preconnect the font files wait on a

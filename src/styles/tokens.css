@@ -91,6 +91,24 @@
    */
   --color-chrome: #0b0b0de6;
   --blur-chrome: 20px;
+  --saturate-chrome: 180%;
+
+  /* Glass edges (Phase 6.3). 1px inset hairlines, not fills — the 0.90 fill
+   * alpha above is untouched, so no composited BACKGROUND changes and every
+   * Phase 6.1 ratio still holds.
+   *   highlight = the lit top edge, as if light catches the pane's lip
+   *   edge      = the faint outer boundary separating glass from content
+   *
+   * WHY 0x0c AND NOT SOMETHING PRETTIER. Text never reaches these strips —
+   * the tightest chrome padding in the app is 10px — so strictly they cannot
+   * affect any text ratio. Rather than rest on that geometry (a future padding
+   * change would silently invalidate it), the alpha is set so that EVEN TEXT
+   * SITTING DIRECTLY ON AN EDGE clears AA: at 0x0c the worst case is text-3 at
+   * 5.07:1 and the red Reject label at 4.59:1. At the 0x1f this started at,
+   * those were 4.00 and 3.62 — both under. Raising it re-breaks Reject first.
+   */
+  --color-glass-highlight: #ffffff0c;
+  --color-glass-edge: #ffffff0c;
 
   /* --- Radius: concentric. Outer containers larger, nested smaller --------
    * pane > card > control > tag. A nested radius must be smaller than its
@@ -109,12 +127,23 @@
   --duration-base: 200ms;
 
   /* --- Type ---------------------------------------------------------------
-   * IBM Plex Sans Thai FIRST so Thai never falls through to a system font
-   * (it has no Latin numerals issue — Inter follows for Latin/numerals, and
-   * the browser picks per-glyph). The system stack is the last resort only.
+   * IBM Plex Sans Thai FIRST so Thai never falls through to a system font.
+   * The browser picks per glyph, so Thai glyphs resolve here and Latin glyphs
+   * fall through to the rest of the stack.
+   *
+   * SF IS REFERENCED, NEVER BUNDLED. -apple-system / BlinkMacSystemFont /
+   * "SF Pro Text" name fonts already installed on the user's Apple device; the
+   * browser loads them from the OS. We do NOT ship, self-host, subset or
+   * download any SF file — Apple's licence does not permit web distribution,
+   * and referencing an installed system face is not distribution. Remove those
+   * three entries and Apple users simply get Inter; add a @font-face pointing
+   * at an SF file and the project is in breach. Do not do the latter.
+   *
+   * Inter stays: it is what Windows, Android and Linux actually render, and it
+   * is the numeral face the whole numbers-first layout was measured against.
    */
-  --font-sans: "IBM Plex Sans Thai", "Inter", ui-sans-serif, system-ui,
-    "Segoe UI", sans-serif;
+  --font-sans: "IBM Plex Sans Thai", -apple-system, BlinkMacSystemFont,
+    "SF Pro Text", system-ui, "Inter", ui-sans-serif, "Segoe UI", sans-serif;
 
   /* Four sizes, and no component may use anything else.
    *
@@ -177,21 +206,47 @@ body {
   border-radius: var(--radius-control);
 }
 
-/* --- Translucent chrome ---------------------------------------------------
- * .chrome is the ONLY way a component opts into blurred material, so the
- * @supports fallback lives in exactly one place. Where backdrop-filter is
- * unavailable the surface goes fully opaque rather than translucent-without-
- * blur, which would let text sit directly over scrolling content.
+/* --- Glass (floating chrome) ----------------------------------------------
+ * .chrome is the ONLY way a component opts into the material, so every
+ * fallback lives in exactly one place. FLOATING CHROME ONLY — headers, the
+ * segmented bar, sticky action bars, overlays. Long-form content surfaces stay
+ * opaque: blurred material behind a paragraph makes its effective contrast
+ * depend on whatever happens to be scrolling underneath, which cannot be
+ * verified against a single background.
+ *
+ * CONTRAST NOTE. The fill alpha is 0.90 and Phase 6.1 measured why (see the
+ * token). The glass treatment added here is deliberately all EDGES —
+ * inset hairlines drawn via box-shadow — so it adds no layer between text and
+ * its background and cannot move a single contrast ratio. If a future effect
+ * needs more transparency, put a solid scrim behind the text rather than
+ * lowering the alpha.
  */
 @utility chrome {
   background-color: var(--color-chrome);
-  backdrop-filter: blur(var(--blur-chrome)) saturate(180%);
-  -webkit-backdrop-filter: blur(var(--blur-chrome)) saturate(180%);
+  backdrop-filter: blur(var(--blur-chrome)) saturate(var(--saturate-chrome));
+  -webkit-backdrop-filter: blur(var(--blur-chrome)) saturate(var(--saturate-chrome));
+  /* 1px lit top edge + faint outer boundary. inset so no layout shift. */
+  box-shadow:
+    inset 0 1px 0 0 var(--color-glass-highlight),
+    inset 0 0 0 1px var(--color-glass-edge);
 }
 
+/* No backdrop-filter (older Firefox, some embedded webviews): go fully opaque
+ * rather than translucent-without-blur, which would put text directly over
+ * scrolling content. The edges stay — they read fine on a solid surface. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .chrome {
     background-color: var(--color-bg);
+  }
+}
+
+/* Users who ask for less transparency get none: solid surface, no blur. The
+ * edges are kept so the chrome is still visibly a distinct plane. */
+@media (prefers-reduced-transparency: reduce) {
+  .chrome {
+    background-color: var(--color-bg);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 }
 

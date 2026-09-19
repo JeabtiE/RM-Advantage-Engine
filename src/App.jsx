@@ -19,8 +19,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useDraft, DraftStatus } from "./hooks/useDraft.js";
 import { mockNews } from "./data/mockNews.js";
+import { cachedDemoRuns } from "./data/cachedDemoRun.js";
 import { fetchLiveNews } from "./utils/liveNews.js";
-import NewsRail, { SOURCES } from "./components/NewsRail.jsx";
+import NewsRail from "./components/NewsRail.jsx";
 import ApprovalDashboard from "./components/ApprovalDashboard.jsx";
 import ClientList from "./components/ClientList.jsx";
 import ScriptViewer from "./components/ScriptViewer.jsx";
@@ -33,6 +34,19 @@ import {
 } from "./components/icons.jsx";
 
 const VIEWS = { APPROVAL: "approval", CLIENTS: "clients", SCRIPTS: "scripts" };
+
+// The item selected on first load. It MUST be a cached demo scenario so a
+// first-time visitor sees a real analysis rather than a live item that needs a
+// key. Derived from the cache rather than hardcoded, so dropping N006 from the
+// cache degrades to another cached item instead of silently selecting one that
+// would fail at the gate.
+const PREFERRED_FIRST = "N006"; // the tariff/gold dislocation — the money shot
+const DEFAULT_ID =
+  mockNews.find(
+    (n) => n.id === PREFERRED_FIRST && Object.hasOwn(cachedDemoRuns, n.id),
+  )?.id ??
+  mockNews.find((n) => Object.hasOwn(cachedDemoRuns, n.id))?.id ??
+  null;
 
 export default function App() {
   const {
@@ -51,25 +65,31 @@ export default function App() {
   } = useDraft();
 
   const [view, setView] = useState(VIEWS.APPROVAL);
-  const [selectedId, setSelectedId] = useState(null);
-  const [source, setSource] = useState(SOURCES.PRESET);
+  const [selectedId, setSelectedId] = useState(DEFAULT_ID);
   const [liveItems, setLiveItems] = useState([]);
   const [liveLoading, setLiveLoading] = useState(false);
   const [liveError, setLiveError] = useState(null);
+  const [liveNonce, setLiveNonce] = useState(0); // bumped by the refresh button
   const [railOpen, setRailOpen] = useState(false); // mobile disclosure only
 
   const isAnalyzing = status === DraftStatus.ANALYZING;
-  const isLive = source === SOURCES.LIVE;
-  const items = isLive ? liveItems : mockNews;
+  // One list, two sections: the rail renders live above demo. This union exists
+  // only so a selected id can be resolved back to its news item.
+  const items = [...liveItems, ...mockNews];
   const selectedNews = items.find((n) => n.id === selectedId) ?? null;
 
-  // Auto-fetch on switching to live. Fires once per entry into live mode and
-  // aborts on unmount / switch away, which also makes the StrictMode
-  // double-invoke in dev harmless: the first pass aborts itself instead of
-  // racing a second response into state. (Moved up from NewsFeed unchanged.)
+  // Live news is fetched ON MOUNT (and again on refresh) so the Live section
+  // has content without the user hunting for a toggle.
+  //
+  // This does NOT put the demo on a live API (hard constraint #5). The demo
+  // items render from mockNews immediately and resolve from the frozen cache;
+  // they are unaffected by this request being slow, failing or hanging. The
+  // only thing a failure changes is a notice inside the Live section.
+  //
+  // The abort on unmount also makes the StrictMode double-invoke in dev
+  // harmless: the first pass aborts itself instead of racing a second response
+  // into state.
   useEffect(() => {
-    if (!isLive) return;
-
     const controller = new AbortController();
     setLiveLoading(true);
     setLiveError(null);
@@ -89,20 +109,15 @@ export default function App() {
       });
 
     return () => controller.abort();
-  }, [isLive]);
+  }, [liveNonce]);
 
-  // Switching source drops the selection and any draft built from it —
-  // otherwise the working pane would keep showing analysis for a headline no
-  // longer in the list.
-  const handleSourceChange = useCallback(
-    (next) => {
-      if (isAnalyzing || next === source) return; // don't switch mid-call
-      setSource(next);
-      setSelectedId(null);
-      if (status !== DraftStatus.IDLE) reset();
-    },
-    [isAnalyzing, source, status, reset],
-  );
+  // Refresh re-runs the effect above. It deliberately does NOT touch the
+  // selection: the user may be part-way through reviewing a draft, and
+  // re-pulling headlines is not a reason to discard that.
+  const handleRefreshLive = useCallback(() => {
+    if (isAnalyzing || liveLoading) return;
+    setLiveNonce((n) => n + 1);
+  }, [isAnalyzing, liveLoading]);
 
   // Selecting a different item after a run clears the stale draft so the
   // working pane never shows analysis for the wrong headline.
@@ -184,17 +199,16 @@ export default function App() {
 
   const rail = (
     <NewsRail
-      items={items}
+      liveItems={liveItems}
+      demoItems={mockNews}
       selectedId={selectedId}
       onSelect={handleSelect}
       onAnalyze={handleAnalyze}
+      onRefreshLive={handleRefreshLive}
       statusFor={statusFor}
       isAnalyzing={isAnalyzing}
-      source={source}
-      onSourceChange={handleSourceChange}
       liveLoading={liveLoading}
       liveError={liveError}
-      liveCount={liveItems.length}
     />
   );
 
@@ -202,18 +216,21 @@ export default function App() {
     <div className="flex h-dvh flex-col overflow-hidden bg-bg">
       {/* App header — floating chrome across both panes */}
       <header className="chrome z-20 flex shrink-0 items-center justify-between gap-4 border-b border-hairline px-4 py-2.5">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-tag border border-hairline-strong text-caption font-bold text-text-2">
-            RM
-          </span>
-          <div className="min-w-0">
-            <h1 className="truncate text-caption font-semibold text-text">
-              News-to-Action
-            </h1>
-            <p className="truncate text-caption text-text-3">
-              Impact analysis, dislocation detection, Four Eyes approval
-            </p>
-          </div>
+        <div className="flex min-w-0 items-center gap-2">
+          {/* The white mark, because the header is near-black glass. The source
+              packages are both transparent-background, so this is the variant
+              that reads here; the light-background variants go to the favicon.
+              width/height are set so the row never reflows while it loads. */}
+          <img
+            src="/mark-white.png"
+            alt=""
+            width="18"
+            height="18"
+            className="h-[18px] w-[18px] shrink-0"
+          />
+          <h1 className="truncate text-caption font-bold tracking-[0.14em] text-text">
+            BULLETIN
+          </h1>
         </div>
         <span className="shrink-0 text-caption text-text-3">CIO</span>
       </header>
@@ -248,7 +265,13 @@ export default function App() {
             />
           </button>
           {railOpen && (
-            <div className="max-h-[60dvh] border-t border-hairline">{rail}</div>
+            // h-, not max-h-: NewsRail is a full-height flex column whose list
+            // scrolls and whose Analyze bar is pinned to its bottom. Against a
+            // max-height the column has no definite height to resolve against,
+            // so it overflowed and was clipped — the last row cut mid-line and
+            // the Analyze button unreachable. A definite height makes the inner
+            // scroll work as it does in the desktop pane.
+            <div className="h-[60dvh] border-t border-hairline">{rail}</div>
           )}
         </div>
 
