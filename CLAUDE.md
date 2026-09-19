@@ -403,6 +403,21 @@ CIO, but the run is lost (1 of 5 attempts here, ~20%). Options if it recurs:
 tell Agent 1 not to use double quotes inside string values, or repair/retry on
 parse failure. Both change behaviour, so neither was done in the eval phase.
 
+### Within-session stability does not imply stability across prompt versions
+
+The stability eval measures ONE session: identical calls, minutes apart. Every
+item scored 3/3 or 5/5 agreement there — yet **N007 technology was `negative` in
+the cached run (2026-09-17) and `positive` in all three runs on 2026-09-19**,
+with the Phase 4.2 action-language rescoping landing in between. Same model,
+same temperature 0. Prompt changes are a plausible cause; ordinary cross-session
+drift is another, and the eval cannot separate them from two sessions.
+
+**Rule: re-measure after ANY prompt change, before regenerating the cache.**
+A green stability run taken before a prompt edit says nothing about behaviour
+after it, and a direction flip silently changes which clients the RM calls (a
+neutral sector drops out of matching entirely). The regen ranking diff is the
+last line of defence, not the first.
+
 ### Client ranking varies run to run (accepted)
 
 Agent 1's per-sector direction is not fully stable even at `temperature: 0`.

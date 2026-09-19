@@ -170,7 +170,10 @@ export function itemMetrics({ newsId, outputs, clientSets }) {
 const pct = (x) => `${(x * 100).toFixed(0)}%`;
 
 // toMarkdown — one table per news item, plus the run's provenance header.
-export function toMarkdown({ model, temperature, runs, startedAt, items, callsUsed, notes = [] }) {
+// `sections` are free-text blocks appended after the per-item tables — for
+// findings the per-item metrics cannot express, e.g. comparing a run against an
+// EARLIER session (these metrics only ever describe one session).
+export function toMarkdown({ model, temperature, runs, startedAt, items, callsUsed, notes = [], sections = [] }) {
   const lines = [
     "# Agent 1 stability eval — latest run",
     "",
@@ -180,11 +183,12 @@ export function toMarkdown({ model, temperature, runs, startedAt, items, callsUs
     `- **Date:** ${startedAt}`,
     `- **Real Anthropic calls:** ${callsUsed}`,
     "",
-    "> These numbers are a snapshot of ONE session. They are not a guarantee of",
-    "> future behaviour, not a benchmark, and not a quality judgement: the model",
-    "> can answer differently on the next run even at temperature 0. The",
-    "> stability score is the mean of the modal-agreement shares below — a rough",
-    "> indicator for spotting which item moved most, nothing more.",
+    "> These numbers are a snapshot of the session(s) recorded above. They are not",
+    "> a guarantee of future behaviour, not a benchmark, and not a quality",
+    "> judgement: the model can answer differently on the next run even at",
+    "> temperature 0, and a different PROMPT VERSION can answer differently again.",
+    "> The stability score is the mean of the modal-agreement shares below — a",
+    "> rough indicator for spotting which item moved most, nothing more.",
     "",
   ];
   for (const n of notes) lines.push(`> ⚠️ ${n}`, "");
@@ -241,6 +245,9 @@ export function toMarkdown({ model, temperature, runs, startedAt, items, callsUs
       lines.push(`| ${id} | ${c.runs}/${item.runs} |`);
     }
     lines.push("");
+  }
+  for (const { title, body } of sections) {
+    lines.push(`## ${title}`, "", body, "");
   }
   return lines.join("\n");
 }

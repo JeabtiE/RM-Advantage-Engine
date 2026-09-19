@@ -163,7 +163,8 @@ test("toMarkdown: records provenance, the snapshot caveat and a table per item",
   assert.match(md, /\*\*Temperature:\*\* 0/);
   assert.match(md, /\*\*Runs per item \(N\):\*\* 1/);
   assert.match(md, /2026-09-19/);
-  assert.match(md, /snapshot of ONE session/);
+  assert.match(md, /snapshot of the session\(s\) recorded above/);
+  assert.match(md, /a different PROMPT VERSION can answer differently again/);
   assert.match(md, /## N006 — Tariff/);
   assert.match(md, /\| banking \| 1\/1 \|/);
   assert.match(md, /\*\*Incomplete:\*\* boom/);
@@ -205,4 +206,19 @@ test("isTransportError: endpoint codes end the item; codeless failures are retry
   assert.equal(isTransportError(new TypeError("fetch failed")), true);
   assert.equal(isTransportError(Object.assign(new Error("gateway"), { status: 504, code: null })), true);
   assert.equal(isTransportError(undefined), true);
+});
+
+test("toMarkdown: extra sections are appended after the per-item tables", () => {
+  const outputs = [out({ sectors: [{ sector: "banking", direction: "positive" }] })];
+  const md = toMarkdown({
+    model: "m",
+    temperature: 0,
+    runs: 1,
+    startedAt: "2026-09-19T00:00:00.000Z",
+    items: [{ ...itemMetrics({ newsId: "N007", outputs, clientSets: [["C001"]] }), headline: "Fed" }],
+    callsUsed: 1,
+    sections: [{ title: "Cross-session variance", body: "technology differs between sessions." }],
+  });
+  assert.match(md, /## Cross-session variance\n\ntechnology differs between sessions\./);
+  assert.ok(md.indexOf("## N007") < md.indexOf("## Cross-session variance"), "appended last");
 });

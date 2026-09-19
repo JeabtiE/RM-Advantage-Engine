@@ -194,7 +194,11 @@ Return ONLY a JSON object, no markdown fences, no prose around it, with exactly 
   "dislocation_description": string,   // Thai. State (a) what was expected, (b) what actually happened, (c) what the gap may indicate and your confidence, in analyst terms — never an instruction to a client (see Limits). Empty string if none.
   "reasoning": string                  // Thai, max 2 lines. The causal chain, not a news summary. For systemic events, it must justify the sectors you expanded to.
 }
-Write dislocation_description and reasoning in Thai (the RM-facing language). Keep the JSON keys and enum values in English exactly as above.`;
+Write dislocation_description and reasoning in Thai (the RM-facing language). Keep the JSON keys and enum values in English exactly as above.
+JSON VALIDITY — the response is machine-parsed, and one stray character loses the whole analysis:
+- Never put a raw double quote (") inside a string value. For emphasis or a quoted phrase use Thai quotation marks (“ ”) or no quotes at all; if you must use a double quote, escape it as \\".
+- WRONG: "reasoning": "ตลาดมองว่าเป็น "buy the fact" มากกว่าสัญญาณเชิงลบ"  ->  RIGHT: "reasoning": "ตลาดมองว่าเป็น “buy the fact” มากกว่าสัญญาณเชิงลบ"
+- No trailing commas, no comments, no text before or after the JSON object.`;
 
 // callClaude — single Messages API call with retry.
 // Retries: up to MAX_RETRIES. 429 -> wait 10s then retry. 5xx / network ->
@@ -300,6 +304,43 @@ function parseAIResponse(raw) {
   }
 }
 
+// callClaudeJson — callClaude + parse, with ONE retry on a parse failure.
+//
+// WHY: the model occasionally returns invalid JSON — measured live on 2026-09-19,
+// 1 of 5 Agent 1 runs emitted an unescaped double quote inside a Thai string
+// (…เป็น "buy the fact" มากกว่า…), which JSON.parse rejects. The prompt now forbids
+// that, but prompts are guidance; a single clean re-ask recovers the run.
+//
+// SEPARATE FROM callClaude's RETRY BUDGET, and deliberately not stacked with it:
+// callClaude owns transport retries (429 -> 10s, 5xx/network -> short backoff)
+// and has already exhausted them by the time it returns text. A parse failure
+// adds at most ONE more callClaude invocation, never a fresh transport budget
+// per parse attempt.
+//
+// NO PROGRAMMATIC REPAIR, deliberately: a regex that "fixes" quotes or commas
+// rewrites what the analyst said. A wrong repair produces plausible but
+// incorrect analysis that reads fine to the CIO and reaches a client script —
+// far worse than a visible error the pipeline refuses to cache.
+const PARSE_RETRIES = 1;
+
+async function callClaudeJson({ system, user, maxTokens, agent }) {
+  let lastErr;
+  for (let attempt = 0; attempt <= PARSE_RETRIES; attempt++) {
+    const raw = await callClaude({ system, user, maxTokens });
+    try {
+      return parseAIResponse(raw);
+    } catch (err) {
+      lastErr = err;
+      const willRetry = attempt < PARSE_RETRIES;
+      console.error(
+        `[claude-agent] ${agent}: unparseable JSON${willRetry ? " — retrying once" : " after 1 retry — giving up"}: ` +
+          String(raw).slice(0, 300),
+      );
+    }
+  }
+  throw lastErr;
+}
+
 // -------------------------------------------------------------------------
 // Agent 1 — Impact + Dislocation Analyzer
 // Input: a news item (with content + marketOutcome) and a holdings summary
@@ -324,12 +365,12 @@ Analyze this event using the three-step dislocation methodology. Return the JSON
   // Budget: AGENT1_MAX_TOKENS (see the constant for the sizing). Silent
   // truncation is a live-demo killer, and since Phase 3.2 the per-sector
   // reasons make a 7-sector answer the worst case.
-  const raw = await callClaude({
+  const parsed = await callClaudeJson({
     system: AGENT1_SYSTEM_PROMPT,
     user,
     maxTokens: AGENT1_MAX_TOKENS,
+    agent: "impact",
   });
-  const parsed = parseAIResponse(raw);
   // Ticker discipline (only named / company-specific tickers on systemic and
   // sector news) is prompt guidance ONLY — deliberately no server-side cap. A
   // count cap cannot tell a sector sweep from a legitimately named list (a news
@@ -599,7 +640,11 @@ Return ONLY a JSON object, no markdown fences, no prose around it, with exactly 
   "flagged_issues": [string],     // Thai. One short line per approval-blocking problem; empty array if none
   "adjusted_reasoning": string    // Thai. If issues were found, a corrected version of Agent 1's reasoning with the unsupported claims removed/fixed. If none, echo Agent 1's reasoning unchanged.
 }
-Write flagged_issues and adjusted_reasoning in Thai (the RM-facing language). Keep the JSON keys in English exactly as above.`;
+Write flagged_issues and adjusted_reasoning in Thai (the RM-facing language). Keep the JSON keys in English exactly as above.
+JSON VALIDITY — the response is machine-parsed, and one stray character loses the whole analysis:
+- Never put a raw double quote (") inside a string value. For emphasis or a quoted phrase use Thai quotation marks (“ ”) or no quotes at all; if you must use a double quote, escape it as \\".
+- WRONG: "reasoning": "ตลาดมองว่าเป็น "buy the fact" มากกว่าสัญญาณเชิงลบ"  ->  RIGHT: "reasoning": "ตลาดมองว่าเป็น “buy the fact” มากกว่าสัญญาณเชิงลบ"
+- No trailing commas, no comments, no text before or after the JSON object.`;
 
 // factCheck — Agent 2. Verifies an Agent 1 result against the source news.
 // Input: the original news item (content + marketOutcome) and the parsed
@@ -626,12 +671,12 @@ Verify the Agent 1 analysis against the original news and market outcome above. 
   // adjusted_reasoning can echo Agent 1's full reasoning, so this tracks
   // Agent 1's size (AGENT2_MAX_TOKENS) — a truncated fact check fails silently
   // in the same way.
-  const raw = await callClaude({
+  const parsed = await callClaudeJson({
     system: AGENT2_SYSTEM_PROMPT,
     user,
     maxTokens: AGENT2_MAX_TOKENS,
+    agent: "factcheck",
   });
-  const parsed = parseAIResponse(raw);
   // Same rule as Agent 1: the notes field is the server's, never the model's.
   if (parsed && typeof parsed === "object") delete parsed.factcheck_normalization_notes;
   return normalizeAgent2Output(parsed);
@@ -805,7 +850,11 @@ Return ONLY a JSON object, no markdown fences, no prose around it, with exactly 
 {
   "script": string   // Thai. The call script. Max 3 sentences, informational only, tone matched to the client's risk profile.
 }
-Write the script in Thai (the client-facing language). Keep the JSON key in English exactly as above.`;
+Write the script in Thai (the client-facing language). Keep the JSON key in English exactly as above.
+JSON VALIDITY — the response is machine-parsed, and one stray character loses the whole analysis:
+- Never put a raw double quote (") inside a string value. For emphasis or a quoted phrase use Thai quotation marks (“ ”) or no quotes at all; if you must use a double quote, escape it as \\".
+- WRONG: "reasoning": "ตลาดมองว่าเป็น "buy the fact" มากกว่าสัญญาณเชิงลบ"  ->  RIGHT: "reasoning": "ตลาดมองว่าเป็น “buy the fact” มากกว่าสัญญาณเชิงลบ"
+- No trailing commas, no comments, no text before or after the JSON object.`;
 
 // Post-processing typo guard for Agent 3 output. The model occasionally emits a
 // malformed Thai financial term, and because temperature is 0 the SAME bad token
@@ -871,12 +920,12 @@ Write this client's phone script. Match the tone to their risk profile. Return t
   // wrapper adds overhead — the same maxTokens lesson as Agent 1/2. 1024 gives
   // enough headroom that a 3-sentence Thai script never truncates mid-string
   // into invalid JSON (silent truncation is a live-demo killer).
-  const raw = await callClaude({
+  const parsed = await callClaudeJson({
     system: AGENT3_SYSTEM_PROMPT,
     user,
     maxTokens: AGENT3_MAX_TOKENS,
+    agent: "script",
   });
-  const parsed = parseAIResponse(raw);
   // length_exceeded is the server's verdict, never the model's.
   if (parsed && typeof parsed === "object") delete parsed.length_exceeded;
   // Fix known term typos before the script leaves this function — every caller

@@ -2,23 +2,24 @@
 
 - **Model:** `claude-sonnet-4-6`
 - **Temperature:** 0
-- **Runs per item (N):** 5
-- **Date:** 2026-09-19T08:21:11.303Z
-- **Real Anthropic calls:** 13
+- **Runs per item (N):** 5 (N006, EVAL-CPN) / 3 (N007)
+- **Date:** 2026-09-19T08:21:11.303Z (N006, EVAL-CPN) · 2026-09-19T08:45:07.628Z (N007)
+- **Real Anthropic calls:** 12
 
-> These numbers are a snapshot of ONE session. They are not a guarantee of
-> future behaviour, not a benchmark, and not a quality judgement: the model
-> can answer differently on the next run even at temperature 0. The
-> stability score is the mean of the modal-agreement shares below — a rough
-> indicator for spotting which item moved most, nothing more.
+> These numbers are a snapshot of the session(s) recorded above. They are not
+> a guarantee of future behaviour, not a benchmark, and not a quality
+> judgement: the model can answer differently on the next run even at
+> temperature 0, and a different PROMPT VERSION can answer differently again.
+> The stability score is the mean of the modal-agreement shares below — a
+> rough indicator for spotting which item moved most, nothing more.
 
-> ⚠️ N006 and EVAL-CPN were measured at 2026-09-19T08:21:11.303Z (9 calls), BEFORE the Agent 1 max_tokens fix.
+> ⚠️ N006 and EVAL-CPN: measured 2026-09-19T08:21:11.303Z, N=5, 9 calls, BEFORE the Agent 1 token fix.
 
-> ⚠️ N007 was measured separately at 2026-09-19T08:36:34.641Z (4 calls), AFTER raising Agent 1 to 6144 tokens (Phase 5b.1). Its earlier attempt failed outright: the 2048-token budget cut the JSON mid-word.
+> ⚠️ N007: measured 2026-09-19T08:45:07.628Z, N=3, 3 runner-counted calls, AFTER raising Agent 1 to 6144 tokens and adding the JSON-validity rule + one endpoint parse retry. An earlier N007 attempt at 2048 tokens failed outright (JSON cut mid-word).
 
-> ⚠️ EVAL-CPN stopped after 2 runs on a transport failure that the eval harness did not retry; the runner now retries transport failures like production does.
+> ⚠️ EVAL-CPN stopped after 2 of 5 runs on a transport failure the harness did not retry; the runner now retries transport failures once, like production.
 
-> ⚠️ N007 completed 3 of 5 runs: run 4 returned MALFORMED (not truncated) JSON — the model wrote an unescaped double quote inside a Thai string (…เป็น "buy the fact" มากกว่า…), which JSON.parse rejects. That is a separate, unfixed issue.
+> ⚠️ In the N007 run, 1 of 4 model responses was still invalid JSON (unescaped double quote). The endpoint's parse retry recovered it, so all 3 runs completed. The per-run `retries` field counts only the RUNNER's transport retries — an endpoint-side parse retry is invisible to it and shows as a gap between runner calls (3) and real API calls (4).
 
 ## N006 — ทรัมป์ประกาศขึ้นภาษีนำเข้าทั่วโลก ตลาดการเงินผันผวนหนัก
 
@@ -86,10 +87,6 @@ Runs: 2 · stability score: **100%** (rough indicator)
 
 ## N007 — Fed raises federal funds rate by 25 basis points to 3.75%-4.00%, first hike since July 2023
 
-**Incomplete:** Agent "impact" request failed (502): invalid_model_output
-
-Metrics below cover the 3 completed run(s) only — treat them as indicative.
-
 Runs: 3 · stability score: **100%** (rough indicator)
 
 | Field | Modal value | Agreement | Distribution |
@@ -124,3 +121,26 @@ Runs: 3 · stability score: **100%** (rough indicator)
 | C008 | 3/3 |
 | C009 | 3/3 |
 | C010 | 3/3 |
+
+## Cross-session variance (prompt versions)
+
+These metrics describe ONE session each. Comparing sessions is the only way to
+see prompt-version drift, and there is some:
+
+| Item | Field | 2026-09-17 (cached run) | 2026-09-19 (this eval) |
+|---|---|---|---|
+| N007 | technology direction | `negative` | `positive` (3/3, and 3/3 in an earlier 08:36 run) |
+| N006 | healthcare direction | `neutral` (Phase 3.2 run) | `neutral` (5/5) |
+
+Within each session agreement was total (3/3 or 5/5 on every field of every
+item). Across sessions, N007's technology direction differs. Between the two
+dates the Agent 1 and Agent 2 prompts changed (Phase 4.2 rescoped the
+action-language rule; Phase 5b.1/5b.2 raised max_tokens and added a
+JSON-validity rule). Model and temperature (0) were unchanged.
+
+**The prompt changes are a plausible cause, not a proven one.** Two sessions
+cannot separate prompt effects from ordinary cross-session drift; establishing
+that would need the old prompt re-run today, which was not done. What the data
+does support: a direction can differ between prompt versions even when it looks
+perfectly stable within a session — and technology's direction is exactly the
+open `TEAM DECISION NEEDED` in src/data/cioReviews/N007.json.
