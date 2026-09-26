@@ -4,7 +4,6 @@
 
 **A News-to-Action Intelligence Platform for Relationship Managers in Thai wealth management.**
 
-> "เราไม่ได้สร้างเครื่องมืออ่านข่าวให้ RM เราสร้างเครื่องมือที่ทำให้ RM มีอะไรที่ลูกค้าอ่านเองไม่ได้"
 > *(We didn't build a tool that reads news for RMs we built a tool that gives RMs something clients can't read for themselves.)*
 
 Built for the **AI × Finance Hackathon by CFA Society Thailand** (2026). 🏆 **1st Place / WINNER!!!.**
